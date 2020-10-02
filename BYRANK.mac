@@ -1,0 +1,94 @@
+macro
+#       Macro:  BYRANK.MAC
+#  Written by:  CBA  1/11/2006  -- Revised 12/20/2012 
+#     Version:  Minitab 18
+#
+#  This macro stores the ranks of the data for each level of a grouping 
+#  variable.  By default, the smallest value in each group is assigned a 
+#  1, the 2nd smallest value in each group is assigned a 2,... Ties are 
+#  assigned the average rank. 
+#
+#  There is an option to store the reverse ranks where the largest value 
+#  in the each group is assigned a 1, the 2nd largest value in each group
+#  is assigned a 2, ... Ties are assigned the average rank. 
+#  
+#  Suppose your groups are in C2 and the data to be ranked is in C3 and 
+#  you want to store the ranks in C4.  Go to Edit > Command Line Editor
+#  and type the command
+#
+#  %byrank C2 C3 C4
+#
+#  and click on Submit commands.
+#
+#  If you want to store the reverse ranks, choose Edit > Command Line Editor
+#  and type the command
+#
+#  %byrank C2 C3 C4;
+#    reverse.
+#
+#  Click on Submit commands.
+#
+###########################################################################
+#
+#  Neither Minitab, Inc. nor the author(s) of this MACRO makes any claim 
+#  of or offers any Warranty whatsoever with regard to the accuracy of 
+#  this MACRO or its suitability for use.  Minitab, Inc. and the author(s)
+#  of this MACRO each hereby disclaims any Warranty and/or liability with 
+#  respect thereto. 
+#
+###########################################################################
+
+byrank group y ranx;
+reverse.
+
+mcolumn group y ranx gr uniqs freqs u f rs x a z row
+mconstant cnt cnt1 i j 
+
+mreset
+brief 0
+noecho
+
+erase ranx
+Let cnt1 = count(y)
+set row
+  1:cnt1
+end
+sort group y row gr Z row;
+  by group.
+text gr gr
+vorder gr;
+  worksheet.
+tally gr;
+  store uniqs freqs.
+let cnt = n(freqs)
+erase ranx
+do i = 1:cnt
+  copy z x;
+    include;
+    where "gr = uniqs(i)".
+
+ if reverse = 1
+    let j = count(x)
+    set a
+      1:j
+    end
+    sort x a x a;
+      by x.
+    set rs
+      j:1
+    end
+    stat rs;
+      by x;
+      expand;
+      mean rs.
+    sort rs rs;
+      by a.
+    stack ranx rs ranx
+  else
+  rank x rs
+  stack ranx rs ranx
+endif
+enddo
+sort ranx row ranx row;
+  by row.
+endmacro

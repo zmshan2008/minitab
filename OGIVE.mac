@@ -1,0 +1,274 @@
+macro
+#
+#       Macro:  OGIVE.MAC
+#  Written by:  Cathy Akritas, November 2005
+#     Version:  Minitab 18
+#
+#  This macro creates an ogive curve. The default settings create a 
+#  cumulative relative frequency ogive curve. There is an option to create 
+#  a relative frequency ogive curve. The input data can be raw data like 
+#  2 1 5 5 2 1 5 4 5 2 or summarized in a frequency table like the table 
+#  below. 
+#
+#    Mids    Frequency
+#    ---     ---------- 
+#     20        2
+#     25        3
+#     30        0
+#     35        1
+#     40        4
+#
+#  The first column represents the midpoints of the intervals on the 
+#  histogram.  The midpoints must be equally spaced as in the example 
+#  above.  
+#
+#  Suppose your raw data is in C2. To run the macro, choose Edit > Command 
+#  Line Editor.  Type the command, 
+#  
+#  %OGIVE C2
+#
+#  Click on Submit Commands.
+#
+#  To create a relative frequency ogive of the raw data choose Edit > 
+#  Command Line Editor.  Type the commands
+#
+#  %OGIVE C2;
+#   RELFREQ.
+#
+#  Click on Submit Commands. 
+#
+#  Suppose your data are arranged in a frequency table where the midpoints 
+#  of the intervals that you want are in C2 and the frequencies are in 
+#  C3.  To run the macro, choose Edit > Command Line Editor... and type 
+#  the commands
+#
+#  %OGIVE C2;
+#  FREQ C3.
+#
+#  Click on Submit Commands. 
+#  
+#  You can also create a relative frequency ogive using a frequency table 
+#  where the midpoints of the intervals are in C2 and the frequencies are 
+#  in C3.  Go to Edit > Command Line Editor and type the commands
+#
+#  %OGIVE C2;
+#  FREQ C3;
+#  RELFREQ.
+#
+#  Click on Submit Commands. 
+#
+###########################################################################
+#
+#  Neither Minitab, Inc. nor the author(s) of this MACRO makes any claim 
+#  of or offers any Warranty whatsoever with regard to the accuracy of 
+#  this MACRO or its suitability for use.  Minitab, Inc. and the author(s)
+#  of this MACRO each hereby disclaims any Warranty and/or liability with 
+#  respect thereto. 
+#
+###########################################################################
+
+Ogive Y;
+  relfreq;
+  freq F.
+
+mcolumn Y Bins Cnts Mids name title cumul tmp1 temp F Ytmp Ftmp tmp Yall 
+mcolumn ylabs midsline midsdot cumuldot d
+mconstant nam titl incr mid1 start end a Ytype Ftype Ycnt Fcnt i cnt j 
+mconstant binlo binhi bigN sd
+mreset
+noecho
+brief 0
+notitle
+endmtitle
+
+kkname nam Y
+if relfreq = 0
+  copy "Cumulative Relative Frequency Ogive of " temp
+  copy nam name
+  concat temp name title
+  copy title titl
+else
+  copy "Relative Frequency Ogive of " temp
+  copy nam name
+  concat temp name title
+  copy title titl
+endif
+
+dtype Y Ytype
+if Ytype = 0
+  mtitle "Ogive Macro Error";
+    notitle.
+  brief 2
+  print "*** Error *** Input columns must be numeric"
+  print "                    Macro Exiting"
+  endmtitle
+  exit
+endif
+
+If freq = 1
+  dtype Y Ytype
+  dtype f Ftype
+  if Ytype = 0 or Ftype = 0
+    mtitle "Ogive Macro Error";
+      notitle.
+    brief 2
+    print "*** Error *** Input columns must be numeric"
+    print "                    Macro Exiting"
+    endmtitle
+    exit
+  endif
+  count Y Ycnt
+  count F Fcnt
+  if Ycnt <> Fcnt
+    mtitle "Ogive Macro Error";
+      notitle.
+    brief 2
+    Print "*** Error *** Input columns must have same lengths"
+    print "                    Macro Exiting"
+    endmtitle
+    exit
+  endif
+  if Ftype <> 2
+    mtitle "Ogive Macro Error";
+      notitle.
+    brief 2
+    print "*** Error *** All values in frequency column must be integers"
+    print "                    Macro Exiting"
+    endmtitle
+    exit
+  endif
+  diff Y d
+  let sd = stdev(d)
+  if sd <> 0
+    mtitle "Ogive Macro Error";
+      notitle.
+    brief 2
+    print "*** Error *** Midpoints must be equally spaced"
+    print "                    Macro Exiting"
+    endmtitle
+    exit
+  endif
+  let mids = Y
+  let incr = mids[2] - mids[1]
+  let start = mids[1] -.5*incr
+  let end = maxi(mids) + .5*incr
+  set bins
+    start:end/incr
+  end
+   stack '*' mids mids
+  do i = 1:Ycnt
+    copy Y Ytmp;
+      use i.
+    copy F Ftmp;
+      use i.
+    if Ftmp <> 0
+      set tmp
+        (Ytmp)Ftmp
+      end
+      stack Yall tmp Yall
+    endif
+  enddo
+  if Ytype = 3
+    date Yall Yall
+  endif
+else 
+  let Yall = Y
+  Hcut Yall Bins
+  lag bins mids
+  let mids = (bins + mids)/2
+endif  
+let sd = stdev(Yall)
+if sd = 0
+  mtitle "Ogive Macro Error";
+    notitle.
+  brief 2
+  NOTE
+  NOTE *** Error *** There is no variation in the data
+  exit
+endif
+copy mids midsline
+copy mids midsdot
+let midsline[1] = bins[1]
+delete 1 midsdot
+let cnt = n(bins) - 2
+do i = 1:cnt
+  let j = i+1
+  let binlo=bins(i)
+  let binhi=bins(j)
+  let Cnts(i) = sum((yall ge binlo) and (yall < binhi))
+enddo
+let i = cnt + 1
+let j = i + 1
+let binlo=bins(i)
+let binhi=bins(j)
+let Cnts(i) = sum((yall ge binlo) and (yall le binhi))  
+stack midsline binhi midsline
+if relfreq = 1 
+  let cumuldot = parsum(cnts)
+  stack 0 cnts cnts
+  let cumul = parsum(cnts)
+  let bigN = sum(cnts)
+  stack cumul bigN cumul
+  hist Yall;
+    cutp bins;
+    bar;
+      Type 1;
+      Color 22;
+      EType 1;
+      EColor 19;
+      ESize 1;
+    cumulative;
+    grids 2;
+    scale 1;
+      tick midsdot;
+    scale 2;
+      mini -.25;
+    line midsline cumul;
+      size 2;
+    wtitle titl;
+    title titl;
+    marker midsdot cumuldot;
+      type 6;
+      size 1;
+    Axlab 1 nam;
+    Axlab 2 "Cumulative Frequency".
+else
+  let cumuldot = (parsum(cnts)/sum(cnts)) *100
+  stack 0 cnts cnts
+  let cumul = (parsum(cnts)/sum(cnts)) *100
+  stack cumul 100 cumul
+  tset ylabs
+  " 0%" "10%" "20%" "30%" "40%" "50%" "60%" "70%" "80%" "90%" "100%"
+  end
+  hist Yall;
+    cutp bins;
+    scale 1;
+     tick midsdot;
+    percent;
+    cumulative;
+    bar;
+      Type 1;
+      Color 22;
+      EType 1;
+      EColor 19;
+      ESize 1;
+    Axlab 1 nam;
+    Axlab 2 "Cumulative Relative Frequency (%)";
+    grid 2;
+      Type 3;
+      Color 20;
+      Size 1;
+    scale 2;
+      mini -.3;
+      tick 0:100/10;
+      labels ylabs;
+    nodtitle;
+    line midsline cumul;
+      size 2;
+    marker midsdot cumuldot;
+      type 6;
+      size 1;
+    wtitle titl;
+    title titl.
+endif
+endmacro

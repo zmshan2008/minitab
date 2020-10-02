@@ -1,0 +1,54 @@
+Macro
+
+###########################################################################
+#
+#     Name:  ODDEVEN.MAC 
+#   Author:  Andy Haines
+#  Version:  Minitab 18
+#
+#  This macro determines whether each value in a column of integers is odd
+#  or even, then stores the word "odd" or "even" in another column. 
+#
+#  For example, say that the integers are in C4, and that you want 
+#  to store the results in C5. Choose Edit > Command Line Editor, 
+#  and type
+#
+#  %oddeven c4 c5
+#  
+#  Click on Submit Commands.
+###########################################################################
+#
+#  Neither Minitab, Inc. nor the author(s) of this MACRO makes any claim 
+#  of or offers any Warranty whatsoever with regard to the accuracy of 
+#  this MACRO or its suitability for use.  Minitab, Inc. and the author(s)
+#  of this MACRO each hereby disclaims any Warranty and/or liability with 
+#  respect thereto. 
+#
+###########################################################################
+Oddeven input output
+Mcolumn input output divide round diff oddeven
+mconstant k
+
+mreset
+brief 0
+noecho
+notitle
+endmtitle
+
+dtype input k
+if k ne 2
+  mtitle "Odd Even Macro Error";
+    notitle.
+  brief 2
+  print "  **Error**  Values in input column must be integer values"
+  print "                  Macro Exiting"
+  endmtitle
+  exit
+endif
+Let divide =  input / 2
+Let round =  ROUN(divide)
+Let diff =  ABSO(round - divide)
+Let oddeven =  (diff = .5)
+Code (1) "odd" (0) "even" oddeven output
+
+Endmacro

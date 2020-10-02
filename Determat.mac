@@ -1,0 +1,186 @@
+macro
+
+###########################################################################
+#
+#         Macro: DETERMAT.MAC
+#
+#  Submitted by: Eduardo Santiago 6/29/2009
+#       Version: Minitab 18
+#  
+#  This macro calculates the determinant of a matrix by finding its LU 
+#  decomposition. In other words, by transforming a matrix to a product
+#  of a lower (L) and an upper (U) triangular matrix, the determinant 
+#  can be expressed as the product of the diagonal elements of both
+#  matrices.
+#  
+#  The matrix of interest must be square (the numbers of rows and columns
+#  must be equal).  Suppose you want to calculate the determinant of a
+#  3 x 3 matrix. 
+#   
+#  A = [1 2 3
+#       4 5 6
+#       7 8 0]
+#
+#  Choose Edit > Command Line Editor.  Type the following:
+#
+#  %DETERMAT M1;
+#  STORE M2 M3.
+#  
+#  Click on the Submit Commands button.  The output will look something 
+#  like:
+#
+#  Determinant:    0.000
+#  
+#  The optional subcommand allows you to store the Lower and Upper 
+#  triangular matrices. For the example above, M2 will store the Lower 
+#  triangular matrix and M3 will store the Upper triangular matrix in the  
+#  active worksheet.
+#
+#  NOTE: The subcommand 'dimension' is only for macro integrity purposes
+#  and should not be used.  The value of p corresponds to the dimension
+#  of the matrix for which you would like to calculate the determinant.
+#  The macro will find the proper size 'p' of your matrix. Even if it is
+#  provided, the macro will overwrite it.
+#
+##########################################################################
+#
+#  Neither Minitab, Inc. nor the author(s) of this MACRO makes any claim 
+#  of or offers any Warranty whatsoever with regard to the accuracy of 
+#  this MACRO or its suitability for use.  Minitab, Inc. and the author(s)
+#  of this MACRO each hereby disclaims any Warranty and/or liability with 
+#  respect thereto. 
+#
+###########################################################################
+determat array;
+store lower upper;
+dimension p. 
+
+mconstant a i j k l m n p t1 t2 t3 deter flag ind1 ind2 indperm perm
+mmatrix ident array m1 m2 Et Etinv Umatrix Lmatrix lower upper transp
+mcolumn unos x y w.1-w.p z.1-z.p temp.1-temp.p valid
+default p=100
+
+mreset
+noecho
+brief 0
+notitle
+endmtitle
+
+# Check to see if it's a square matrix
+
+	Transpose array transp.      # Find the number of columns m
+	Multiply transp array m1.
+	Diagonal m1 x.
+	Let m = count(x)
+
+	Multiply array transp m2.    # Find the number of rows n
+	Diagonal m2 x.
+	Let n = count(x)
+
+	if m NE n
+	  mtitle "Calculating the Determinant of a Macro Error";
+	    notitle.
+  	  brief 2
+	  Print "   ** Error ** The matrix should be square, but the number of columns"
+	  Print "                    does not match the number of rows"
+                    Print "                    Macro Exiting"
+	  endmtitle
+	  exit
+        else 
+          let p = m
+	endif
+
+# Algorithm begins here.
+
+Set unos
+  1(1:1/1)p
+  End.
+ 
+Diagonal unos ident.
+ 
+let k=0
+let flag=0
+let perm=0
+let indperm=0
+copy array umatrix
+copy ident lmatrix
+copy array z.1-z.p
+let t1=p-1
+ 
+# Outer do loop goes across columns of the matrix performing row-reduced echelon operations
+do i=1:t1
+
+  # Inner loop reduces the lower triangular matrix to zeroes and makes the diagonal 1
+  let t2=p-k
+  do j=1:t2
+
+    copy ident w.1-w.p  
+    copy umatrix z.1-z.p
+    if indperm = 1
+       let j = j-1
+       let indperm = 0
+    endif
+    if j = 1               # This is the diagonal element of the i-th column
+        if z.i[j+k] NE 0
+          let w.i[j+k] = 1/(z.i[j+k])
+        else  # Find a permutation matrix, swap rows in the umatrix and go back one step in j
+          let t3 = p-j-k   # t3 is the number of rows below the current row with a diagonal of zero
+          if t3 = 0        # The matrix is singular the determinant is zero
+            let flag = 1
+            break
+          endif
+          do l=1:t3
+            if z.i[j+k+l] NE 0
+	              do a=1:p
+        	        let temp.a = z.a[j+k]      # Temporary row
+                	let z.a[j+k] = z.a[j+k+l]  # Swap the j+k+l with the j+k-th row
+	                let z.a[j+k+l] = temp.a
+        	      enddo
+		      copy z.1-z.p umatrix
+          	      let perm = perm+1            # Record the number of permutations    
+                      let indperm = 1
+                      break
+            endif
+          enddo
+        endif
+    else
+        let w.i[j+k] = -z.i[j+k]
+    endif
+    Copy w.1-w.p Et
+    Invert Et Etinv
+    Multiply Et umatrix umatrix
+    Multiply lmatrix Etinv lmatrix
+  enddo
+
+  if flag=1
+    break
+  endif
+  let k=k+1
+
+enddo
+
+if store NE 0
+  Copy lmatrix lower
+  Copy umatrix upper
+  Name lower "Lower"
+  Name upper "Upper"
+endif
+
+copy umatrix z.1-z.p
+copy lmatrix w.1-w.p
+
+let deter=1
+do i=1:p
+  let deter = deter*z.i[i]*w.i[i]
+enddo
+let deter = (-1)**perm*deter
+
+mtitle "Determinant of the Matrix";
+  notitle.
+brief 2
+name deter "Determinant: "
+print deter
+endmtitle 
+endmacro
+
+#

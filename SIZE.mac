@@ -1,0 +1,87 @@
+macro
+
+###########################################################################
+#
+#         Macro:  SIZE.MAC
+#       Version:  Minitab 18
+#
+#  Submitted by: Eduardo Santiago 7/08/2009
+#  
+#  This macro calculates the size of a matrix, in other words for a given 
+#  matrix A, it returns the number of columns 'm' and the number of rows
+#  'n' in such matrix.
+#  
+#  In Minitab matrices are denoted by M1, M2, M3...Suppose your matrix is 
+#  in M1.  To run the macro, go to Edit > Command Line Editor and type 
+#  
+#  %size M1
+#
+#  Click on Submit Commands.
+#
+#  Alternatively, you can store the size of the matrix in any two 
+#  constants by using the optional STORE subcommand. Suppose your matrix is
+#  stored in M1, and it is a 5 X 6 matrix. Choose Edit > Command Line Editor.  
+#  Type the following command.
+#
+#  %SIZE M1;
+#  STORE K1 K2.
+#  
+#  Click on the Submit Commands button.  The output will look something 
+#  like:
+#
+#  Size of your matrix
+#
+#  Number of Rows:       5.00000
+#  Number of Columns:    6.00000
+#
+#  In addition, the constants K1 and K2 will contain the number of rows and
+#  columns of your matrix.
+#
+##########################################################################
+#
+#  Neither Minitab, Inc. nor the author(s) of this MACRO makes any claim 
+#  of or offers any Warranty whatsoever with regard to the accuracy of 
+#  this MACRO or its suitability for use.  Minitab, Inc. and the author(s)
+#  of this MACRO each hereby disclaims any Warranty and/or liability with 
+#  respect thereto. 
+#
+###########################################################################
+size array;
+store row column. 
+
+mmatrix array M1 M2 transp
+mcolumn x y z
+mconstant m n row column
+
+noecho
+mreset
+brief 0
+notitle
+endmtitle
+
+# Find the number of rows, n
+Transpose array transp.
+Multiply array transp M2.
+Diagonal M2 x.
+Let n = count(x)
+
+# Find the number of columns, m
+Multiply transp array M1.
+Diagonal M1 x.
+
+Let m = count(x)
+
+if store = 1
+  let row = n
+  let column = m
+endif
+
+mtitle "Size of your matrix";
+  notitle.
+note
+Name n 'Number of Rows:'
+Name m 'Number of Columns:'  
+brief 1
+print n m
+endmtitle
+endmacro

@@ -1,0 +1,552 @@
+macro
+###########################################################################
+#
+# Macro:   WINTMULT2.MAC
+# Date :   June, 1997
+# Author:  Terry Ziemer, modified by Andy Haines to all the use of various
+#          confidence levels
+#
+# Copyright 1997 Minitab Inc. All rights reserved
+#
+###########################################################################
+#    
+#  This macro was modified so you can specify a confidence level other 
+#  than 95% for the prediction intervals for the forecasts when using 
+#  Winters' Method and a multiplicative model is appropriate.
+#
+#  For example, if a multiplicative model type is appropriate, the data is 
+#  in c1, the seasonal length is 2, the level, trend, and seasonal weights 
+#  are .2 .2 .2 respectively, you want 2 forecasts, and you want 99% 
+#  prediction intervals stored in the Worksheet, choose Edit > Command Line 
+#  Editor and type: 
+#
+#  %Wintmult2 C1 2;
+#  Weight 0.2 0.2 0.2;
+#  Forecasts 2;
+#  Conf 99.
+#
+###########################################################################
+#
+#  Neither Minitab, Inc. nor the author(s) of this MACRO makes any claim 
+#  of or offers any Warranty whatsoever with regard to the accuracy of 
+#  this MACRO or its suitability for use.  Minitab, Inc. and the author(s)
+#  of this MACRO each hereby disclaims any Warranty and/or liability with 
+#  respect thereto. 
+#
+###########################################################################
+wintmult2 x m;
+weight w1 w2 w3;
+origin t;
+forecasts kf;
+smoothed Smooth;
+levels Level;
+trends Trend;
+seasonals Seas;
+fstore Forecast;
+lowers Lower;
+uppers Upper;
+residual Error;
+fits Predict;
+smplot;
+noplot;
+table;
+title ttl;
+gsave fn;
+confidence clev.
+mcolumn x Error Level Predict Forecast beta Time Trend Seas s s1 s2 Series param Dat xnew time1
+mcolumn t1l t1y t1x t2l t2y t2x t3l t4l Period z.1-z.m w Smooth Upper Lower temp1 temp2 temp3 ploty
+mconstant w1 w2 w3 m t kf ct alp g h i j k para mape mad msd xn1 xmin xmax ymin ymax
+mconstant xn2 xn3 ttl fn Data Length NMissing ct1 clev clev2 cval
+default w1=.2 w2=.2 w3=.2 t=0 kf=0 ttl=0 fn=0 clev=.95
+
+mreset
+brief 0
+noecho
+notitle
+endmtitle
+
+if clev >= 1
+  divide clev 100 clev
+endif
+if (clev <= 0) or (clev >= 1)
+  call writerror 11
+endif
+
+count x ct1
+set Time
+   1:ct1
+end
+max x ymax
+min x ymin
+copy 0 ct1 xmin xmax
+kkname xn1 x
+kkname Data x
+count x Length
+nmiss x NMissing
+
+copy x xnew
+while n(xnew) <> count(xnew)
+   if xnew[1] = '*'
+      dele 1 xnew
+   else
+      call writerror 5
+   endif
+endwhile
+count xnew ct
+set time1
+   1:ct
+end
+
+if (n(xnew) < 3) or (n(xnew) <= m)
+   call writerror 6
+endif
+
+if title = 0
+   kkset xn2 'Winters'' Multiplicative Model for '
+   kkcat xn2 xn1 ttl
+endif
+let i = ((round(m))-m)**2
+let j = ((round(t))-t)**2
+let k = ((round(kf))-kf)**2
+if (w1 > 1) or (w1 < 0) or (w2 > 1) or (w2 < 0) or (w3 > 1) or (w3 < 0)
+   call writerror 1
+elseif (m < 0) or (i > 0)
+   call writerror 2
+elseif (t < 0) or (t > ct) or (j > 0)
+   call writerror 3
+elseif (kf < 0) or (k > 0)
+   call writerror 4
+endif
+if (smplot = 1) and (noplot = 1)
+   call writerror 10
+endif
+
+# set up seasonal indicator variables
+
+let i = round(ct/m+.4999)+2
+set z.1
+   1 m(0)
+end
+dele 2 z.1
+copy z.1 w
+do j = 1:i
+   stack z.1 w w
+enddo
+copy w z.1
+do j = 2:m
+   subt 1 j i
+   lag i z.1 z.j
+enddo   
+add 1 m h
+add m ct g
+copy z.1-z.m z.1-z.m;
+   use h:g.
+
+# detrend data, get initial trend and level
+
+let temp1 = xnew + 2*(max(xnew) - min(xnew)) + 2*abso(aver(xnew))
+if m > 4
+   add 0 m j
+else
+   if ct > 4
+      add 0 4 j
+   else
+      add 0 ct j
+   endif
+endif
+copy temp1 time1 temp2 ploty;
+   use 1:j.
+regr;
+   response temp2;
+   contin ploty;
+   terms ploty;
+   nodefault;
+   coef beta.
+regr;
+   response temp1;
+   contin time1;
+   terms time1;
+   nodefault;
+   fits Error.
+
+divi xnew Error Error
+let beta[1] = beta[1] - 2*(max(xnew) - min(xnew)) - 2*abso(aver(xnew))
+
+# get initial seasonals
+
+regr; 
+   response Error;
+   contin z.1-z.m;
+   terms z.1 - z.m;
+   nodefault;
+   noco;
+   coef temp3.
+let temp3 = (temp3)/(aver(temp3))
+
+# set initial trend and level values
+
+copy beta j k
+set temp1
+   m(j)
+end
+set temp2
+   m(k)
+end
+
+# compute level, trend, seasonal for each time period
+
+do i = h:g
+   let temp1[i] = w1*(xnew[i-m]/temp3[i-m])+(1-w1)*(temp1[i-1]+temp2[i-1])
+   let temp2[i] = w2*(temp1[i]-temp1[i-1])+(1-w2)*temp2[i-1]
+   let temp3[i] = w3*(xnew[i-m]/temp1[i])+(1-w3)*temp3[i-m]
+enddo
+
+copy (temp1 temp2 temp3) (Level Trend Seas)
+
+# get one-period-ahead predicted values for each time period
+
+let g = ct+m-1
+copy Level Trend s1 s2;
+   use m:g.
+copy Seas param;
+   use 1:ct.
+dele 1:m Level Trend
+let Predict = (s1+s2)*param
+let Smooth = s1*param
+max Predict i
+rmax ymax i ymax
+min Predict i
+rmin ymin i ymin
+
+# get one-period-ahead errors
+
+subt Predict xnew Error
+
+if ct < ct1
+   subt ct ct1 mape
+   set time1
+      mape('*')
+   end
+   stack (time1 time1 time1 time1 time1) (Level Trend Smooth Predict Error) (Level Trend Smooth Predict Error)
+   stack time1 Seas Seas
+endif
+
+mtitle 'Winters''s Multiplicative Model';
+  notitle.
+
+# first, check for zero values in data column
+let temp1 = (x = 0)
+if sum(temp1) > 0
+   copy x Error temp1 temp2;
+      use temp1 = 0.
+   let mape = aver((abso(temp2/temp1))*100)
+   brief 2
+   print " "
+   print " ** Note ** Zero values of Yt exist; MAPE calculated only for non-zero Yt"
+   print " "
+   brief 0
+else
+   let mape = aver((abso(Error/x))*100)
+endif
+let mad = aver(abso(Error))
+let msd = aver(Error**2)
+
+# write out basic output table
+
+brief 2
+print Data Length NMissing
+brief 0
+read Dat;
+   format (3x,a1).
+
+end
+copy w1 w2 w3 t4l
+text t4l t4l
+tset t3l
+"         Alpha (level):  " 
+"    Gamma (trend):  "
+"   Delta (seasonal):  "  
+end
+conc t3l t4l t1l
+tset t4l
+"    MAPE:  "
+"     MAD:  "                   
+"     MSD:  "                      
+end
+copy MAPE MAD MSD t3l
+text t3l t3l
+conc t4l t3l t2l
+read t3l t4l;
+   format(3x,a19,1x,a17).
+   Smoothing Constants Accuracy Measures
+end
+stack t3l t1l Dat t4l t2l Dat
+brief 2
+write Dat
+note
+brief 0
+
+# print out table if needed
+
+if table = 1
+   brief 2
+   print Time x Smooth Predict Error
+   brief 0
+endif
+
+# calculate forecasts if requested
+
+if forecasts = 1
+   if origin = 0              # if no origin given, set to end of series
+      let t = ct1
+   endif
+   if kf > m                  # if more than one full year, append seasonals
+      let g = round(kf/m)+1
+      let h = t+1
+      let i = t+m
+      copy Seas param;
+         use h:i.
+      do j = 2:g
+         stack Seas param Seas
+      enddo
+   endif
+   add t kf i
+   add t 1 j
+   copy Seas param;
+      use j:i.
+   set Period
+      t:i
+end
+   dele 1 Period
+   set Forecast
+      1:kf
+end
+   rmax w1 w2 w3 j
+   subt j 1 k
+   let s = 1+(j/(1+k)**3)*(1+4*k+5*k**2+2*j*(1+3*k)*Forecast+2*j*j*Forecast**2)
+   let s = 1.25*(sqrt(s/(1+(j/(1+k)**3)*(1+4*k+5*k**2+2*j*(1+3*k)+2*j*j))))
+   copy Error ploty;
+      omit Error = '*'.
+   let Upper = parsum(abso(ploty))
+   let g = t - (ct1-ct)
+   let j = (Upper[g])/g             # MAD at Time T
+   let Forecast = (Level[t]+Forecast*Trend[t])*param
+
+   let clev2 = 1 - ((1 - clev)/2)
+   invcdf clev2 cval
+
+   let Upper = Forecast+cval*s*j
+   let Lower = Forecast-cval*s*j
+
+   brief 2
+   print Period Forecast Lower Upper
+   brief 0
+   if noplot = 0
+      max Upper i
+      rmax ymax i ymax
+      min Lower j
+      rmin ymin j ymin
+      if smplot = 0
+         stack (x time) (Predict Time) (Forecast Period) (ploty Time);
+            subs s.
+         read s1 s2;
+            format(12x,f1.0,1x,a9).
+            1 Actual
+            2 Predicted
+            3 Forecast
+end
+      elseif smplot = 1
+         stack (x time) (Smooth Time) (Forecast Period) (ploty Time);
+            subs s.
+         read s1 s2;
+            format(12x,f1.0,1x,a9).
+            1 Actual
+            2 Smoothed
+            3 Forecast
+end
+      endif
+      conv s1 s2 s Series
+      vord Series;
+        work.
+   endif
+else
+   if noplot = 0
+      if smplot = 0
+         stack (x Time) (Predict Time) (ploty Time);
+            subs s.
+         read s1 s2;
+            format(12x,f1.0,1x,a9).
+            1 Actual
+            2 Predicted
+end   
+      elseif smplot = 1
+         stack (x Time) (Smooth Time) (ploty Time);
+            subs s.
+         read s1 s2;
+            format(12x,f1.0,1x,a9).
+            1 Actual
+            2 Smoothed
+end   
+      endif
+      conv s1 s2 s Series
+      vord Series;
+        work.
+   endif
+endif      
+
+dele 1:m Seas
+copy Seas Seas;
+   use 1:Length.
+
+if noplot = 0   
+   let ymax = ymax+.05*(ymax-ymin)
+   let ymin = ymin-.0475*(ymax-ymin)   
+   max Time xmax
+   add 1 xmax xmax
+   copy w1 w2 w3 t1l
+   text t1l t1l;
+      deci 3.
+   copy mape mad msd t2l
+   text t2l t2l
+   stack t1l t2l t2l
+   read t1l;
+      format(6x,a18).
+      Smoothing Constants
+      Alpha (level)
+      Gamma (trend)
+      Delta (season)
+      MAPE
+      MAD
+      MSD
+end
+  set t1x
+    (.8)7
+  end
+  set t1y
+    0.5600 0.52 0.49 .46 .37 .34 .31
+  end
+  set t2x
+  .94 .94 .94 .91 .91 .91
+  end
+  set t2y
+    0.52 0.49 .46 .37 .34 .31
+  end
+
+   if (gsave = 0)
+      layout;
+         wtitle 'Winters Multiplicative Method';
+         title ttl;
+            offset 0 -.05;
+            tsiz 1.5.
+   elseif (gsave = 1)
+      layout;
+         wtitle 'Winters Multiplicative Method';
+         title ttl;
+           offset 0  -.05;
+            tsiz 1.5;
+         gsave fn.
+   endif
+
+   plot ploty*Time;
+      nodtitle;
+      data .12 .775 .15 .9;
+      type 1 ;
+      color 0;
+      lege;
+         etyp 0;
+         tsiz .8;
+      scale 1;
+      max xmax;
+      min xmin;
+      scale 2;
+      max ymax;
+      min ymin;
+      axlabel 2 xn1;
+      axlabel 1 'Time';
+      symb Series;
+         type 6 19 16;
+         size .5 .75 .75;
+         colo 1 4 2;
+      conn Series;
+         type 1 2 3;
+         colo 1 4 2;
+      rectangle .985 .585 .79 .585 .79 .435 .985 .435;
+        unit 0;
+        type 1;
+        color 0;
+        etype 0;
+     rectangle .985 .40 .79 .40 .79 .28  .985 .28;
+        unit 0;
+        type 1;
+        color 0;
+        etype 0;
+      text t1x t1y t1l;
+        unit 0;
+        tsize .8;
+      text t2x t2y t2l;
+        unit 0;
+        tsize .8.
+
+
+   if forecasts = 1
+      plot Upper*Period Lower*Period;
+         nodtitle;
+         data .12 .775 .15 .9;
+           type 0;
+           color 0;
+           etyp 0;
+         legend .8182 .9767 .61 .7275;
+           etype 0;
+           tsize .8;
+           hcolor 0;
+           hpsize .5;
+         over;
+         nobrush;
+       scale 1;
+         max xmax;
+         min xmin;
+      scale 2;
+         max ymax;
+         min ymin;
+         nofr;
+         symb;
+            type 0;
+         conn;
+            type 3;
+            colo 2;
+            size 2;
+            orde 0.
+   endif
+   endlayout
+
+endif 
+endmtitle
+endmacro 
+
+macro 
+writerror x
+mconstant x
+mtitle "Winters Multiplicative Method Macro Error";
+  notitle.
+brief 2
+if x = 1
+   Print " ** Error ** Illegal weight - must be between 0 and 1; execution aborted"
+elseif x = 2
+   Print " ** Error ** Seasonal length must be positive integer; execution aborted"
+elseif x = 3
+   Print " ** Error ** Forecast origin must be an integer < N; execution aborted"
+ elseif x = 4
+   Print " ** Error ** Number of forecasts must be positive integer; execution aborted"
+elseif x = 5
+   Print " ** Error ** Missing data not allowed in this command; execution aborted"
+elseif x = 6
+   Print " ** Error ** Not enough data; execution aborted"
+elseif x = 10
+   Print " ** Error ** Cannot use SMPLOT and NOPLOT together; execution aborted"
+elseif x = 11
+   Print " ** Error ** CONFIDENCE must be between 0 and 1; execution aborted"
+endif
+  Print "                   Macro Exiting"
+endmtitle
+exit
+endmacro

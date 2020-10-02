@@ -1,0 +1,90 @@
+MACRO
+############################################################### 
+#
+#            Macro:  TRIMMEAN.MAC 
+#           Author:  Sarah Haines
+#  Submission Date:  October 2004
+#          Version:  Minitab 18
+#
+#  MINITAB 18 currently calculates the trimmed mean by removing the 
+#  smallest 5% and the largest 5% of the values (rounded to the nearest 
+#  integer), and then averages the remaining values.  This macro will 
+#  calculate the trimmed mean for a specified trimmed percentage, not just 
+#  five percent.
+#
+#  For example, say that the data is stored in C1 and you want to 
+#  calculate a 10% trimmed mean. Go to Edit > Command Line Editor, and 
+#  type: 
+#
+#  %trimmean C1 .10
+#  or
+#  %trimmean C1 10
+#
+#  Click on Submit Commands.
+#
+#  The percentage must be a positive value greater than 0 and less than 
+#  50%.  The mean of the trimmed data will be reported in the Session 
+#  Window.
+#
+###########################################################################
+#
+#  Neither Minitab, Inc. nor the author(s) of this MACRO makes any claim 
+#  of or offers any Warranty whatsoever with regard to the accuracy of 
+#  this MACRO or its suitability for use.  Minitab, Inc. and the author(s)
+#  of this MACRO each hereby disclaims any Warranty and/or liability with 
+#  respect thereto. 
+#
+###########################################################################
+
+TRIMMEAN orig a
+
+mconstant a b c d g 
+mcolumn orig tr sorig final e f 
+
+mreset
+brief 0
+noecho
+notitle
+endmtitle
+
+if a ge 1
+  let a = a/100
+  if a ge .5
+    mtitle "Trimmed Mean Macro Error";
+      notitle.
+    brief 2
+    print "  ** Error ** The given percentage must be less than .5"
+    print "                   Macro Exiting"
+    endmtitle 
+    exit
+  endif
+elseif a le 0
+  mtitle "Trimmed Mean Macro Error";
+    notitle.
+  brief 2
+  print "  ** Error ** The given percentage must be strictly greater than 0"
+  print "                   Macro Exiting"
+  endmtitle 
+  exit
+endif
+
+LET b=round(COUNT(orig)*a,0)  ###This was CEIL
+SORT orig sorig;
+  BY orig.
+LET c=b+1
+LET d=COUNT(orig)-b
+Name final "the trimmed data"
+COPY sorig final;
+  INCLUDE;
+  ROWS c : d.
+let e = count(orig) - count(final)
+text e e;
+maxwidth 10.
+mtitle "   Trimmed Mean";
+  notitle.
+brief 2
+MEAN final
+print e;
+  format('Number of observations trimmed =  ', a10).
+endmtitle
+ENDMACRO

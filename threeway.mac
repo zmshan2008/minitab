@@ -1,0 +1,524 @@
+MACRO
+#
+#                                                                       
+#                      Minitab macro THREEWAY                           
+#                         John S. Heywood                               
+#                           October 2001                                
+#                                                                       
+#  This macro analyzes a three-way contingency table by testing 
+#  hierarchical models based on a log-linear model.  Each model is tested 
+#  for goodness of fit to the data using a likelihood ratio test (G-test),
+#  and individual terms are tested by subtraction.  
+#
+#  The user should be cautioned that a test of an individual term is    
+#  legitimate only if all terms that were omitted from the two          
+#  models (between which the difference was taken) correspond to        
+#  effects that are, in fact, absent.                                   
+#                                                                       
+#  The command format is:                                               
+#                                                                       
+#  %threeway V1 V2 V3 F                                                 
+#                                                                       
+#  The command line arguments V1, V2, and V3 are the names of three     
+#  columns whose entries identify the level of the three factors by     
+#  which observations are classfied.  Thus, if the classification       
+#  factor in column V1 is "gender", then every entry in column V1 will  
+#  be one of two possible values, one corresponding to "male" and       
+#  the other corresponding to "female".  The number of rows of data     
+#  will be equal to the number of cells in the three-way table, and     
+#  the specific cell to which a row corresponds will be identified      
+#  by the combination of values in V1, V2, and V3.                      
+#                                                                       
+#  The command line argument F is the name of a column that contains    
+#  the observed frequencies (integer counts) for each cell in the       
+#  table.                                                               
+#                                                                       
+#  In the output, each model tested is identified by a list of the      
+#  terms that are included.  The three factors are symbolized by the    
+#  upper-case letters A, B, and C.  Model terms are represented by      
+#  the following simple rules:                                          
+#                                                                       
+#  A = main effect of factor A                                          
+#  AB = two-way interaction between factors A and B                     
+#  ABC = three-way interaction between factors A, B, and C.             
+#                                                                       
+#  Models are strictly hierarchical, so that the inclusion of a         
+#  specific term requires the inclusion of all lower-order terms        
+#  that involve any subset of the same factors.  Consequently, terms    
+#  are not listed if their inclusion is implicit in higher-order terms   
+#  that are listed.  For example, the saturated three-way model is      
+#  simply written as (ABC) because the inclusion of the three-way       
+#  interaction implies the inclusion of all two-way interactions (AB,   
+#  AC, and BC) and all main effects (A, B, and C).                      
+#                                                                       
+#  The best-fit model is the simplest model for which the goodness of   
+#  fit statistic is non-significant.  Ordinarily, this is the same as   
+#  the model that includes only those terms whose individual effects    
+#  are statistically significant. Once the best-fit model has been      
+#  identified, it is interpreted as follows:                            
+#                                                                       
+#  (ABC)       Each factor is dependent on the other two.               
+#                                                                       
+#  (AB AC BC)  Each factor is dependent on the other two, although      
+#              the pattern of dependence is less complex due to the     
+#              absence of the three-way interaction.                    
+#                                                                       
+#  (AB BC)     Factors A and C are conditionally independent, that      
+#              is, they are independent for a fixed value of factor     
+#              B.                                                       
+#                                                                       
+#  (A BC)      Factors B and C are jointly independent of factor A.     
+#                                                                       
+#  (A B C)     Factors A, B, and C are mutually independent.            
+#
+#  The macro is currently limited to a maximum of 10 levels per    
+#  factor.  To increase this number, refer to the instructions that
+#  are embedded within the macro code.
+#
+###########################################################################
+#
+#  Neither Minitab, Inc. nor the author(s) of this MACRO makes any claim 
+#  of or offers any Warranty whatsoever with regard to the accuracy of 
+#  this MACRO or its suitability for use.  Minitab, Inc. and the author(s)
+#  of this MACRO each hereby disclaims any Warranty and/or liability with 
+#  respect thereto. 
+#
+###########################################################################
+
+THREEWAY V1 V2 V3 FREQ
+MCOLUMN V1 V2 V3 FREQ VA VB VC OBS EXPECT
+MCOLUMN ALEVELS BLEVELS CLEVELS SCRATCH1
+MCOLUMN MODEL G DF P AT BT CT GT DFT PT GA DFA PA
+MCOLUMN ABT.1-ABT.10 
+MCOLUMN ACT.1-ACT.10
+MCOLUMN BCT.1-BCT.10
+MCOLUMN JUNK.1-JUNK.10
+MCONSTANT LMAX NCELLS NLA NLB NLC ECODE MT
+MCONSTANT K1 K2 K3 K4 K5 K6 ANAME BNAME CNAME 
+#
+#
+# NOTE: This macro currently allows a maximum of 10 levels per variable. 
+#       If more than 10 are needed, you should (1) change the upper suffix 
+#       of the variables ABT, ACT, BCT, and JUNK in the above declaration
+#       statements, (2) change the value of LMAX in the statement below,
+#       and (3) modify this note to reflect the new maximum value.
+#
+
+mreset
+brief 0
+noecho
+notitle
+endmtitle
+
+LET LMAX = 10
+
+LET ECODE = 0
+LET NCELLS=N(FREQ)
+IF N(V1) ~= NCELLS OR N(V2) ~= NCELLS OR N(V3) ~= NCELLS
+  MTITLE "Three-way Contingency Table Analysis Macro Error";
+    notitle.
+  brief 2
+  print "** Error ** Column Lengths Not Equal"
+  print "                 Macro Exiting"  
+  LET ECODE = 1
+  endmtitle
+ENDIF
+BRIEF 0
+TALLY V1;
+  STORE ALEVELS SCRATCH1.
+ERASE SCRATCH1
+LET NLA = N(ALEVELS)
+TALLY V2;
+  STORE BLEVELS SCRATCH1.
+ERASE SCRATCH1
+LET NLB = N(BLEVELS)
+TALLY V3;
+  STORE CLEVELS SCRATCH1.
+ERASE SCRATCH1
+LET NLC = N(CLEVELS)
+IF NLA > LMAX OR NLB > LMAX OR NLC > LMAX
+  MTITLE "Three-way Contingency Table Analysis Macro Error";
+    notitle.
+  brief 2
+  print "** Error ** Too many levels for one or more variables"
+  NAME LMAX '       Current max ='
+  PRINT LMAX
+  print "                 Macro Exiting"
+  LET ECODE = 1
+  endmtitle
+  brief 0
+ENDIF
+LET K1 = NLA*NLB*NLC
+#BRIEF 2
+IF ABS(NCELLS-K1) > .001
+  MTITLE "Three-way Contingency Table Analysis Macro Error";
+    notitle.
+  brief 2
+  print "** Error ** Too few or too many rows of data"
+  print "                 Macro Exiting"
+  LET ECODE = 1
+  endmtitle
+  brief 0
+ENDIF
+SORT V1 V2 V3 FREQ VA VB VC OBS;
+BY V1 V2 V3.
+LET K1 = NCELLS-1
+DO K2 = 1:K1
+   LET K3 = K2+1
+   IF VA[K2]=VA[K3] AND VB[K2]=VB[K3] AND VC[K2]=VC[K3]
+      MTITLE "Three-way Contingency Table Analysis Macro Error";
+        notitle.
+      brief 2
+      print "** Error ** One or more cells missing or duplicated."
+      print "                 Macro Exiting"
+      LET ECODE = 1
+      endmtitle
+      brief 0
+      BREAK
+   ENDIF
+ENDDO
+IF ECODE ~= 0
+  GOTO 100
+ENDIF
+KKNAME ANAME V1 BNAME V2 CNAME V3
+NAME ANAME 'VARIABLE A =' BNAME 'VARIABLE B =' CNAME 'VARIABLE C ='
+NOTITLE
+mtitle "Three-way Contingency Table Analysis";
+  notitle.
+brief 2
+PRINT ANAME BNAME CNAME
+ERASE VA VB VC
+LET K1=NLB*NLC
+LET K2=NLA*NLB
+SET VA
+(1:NLA)K1
+END
+SET VB
+NLA(1:NLB)NLC
+END
+SET VC
+K2(1:NLC)
+END
+NAME G 'G-STATISTIC' P 'P-VALUE'
+LET MODEL[1] = "[1] (AB AC BC)"
+LET MODEL[2] = "[2] (AC BC)      "
+LET MODEL[3] = "[3] (AB BC)      "
+LET MODEL[4] = "[4] (AB AC)      "
+LET MODEL[5] = "[5] (A BC)         "
+LET MODEL[6] = "[6] (B AC)         "
+LET MODEL[7] = "[7] (C AB)         "
+LET MODEL[8] = "[8] (A B C)        "
+#
+#  The following three loops generate the three two-way marginal tables
+#  and the three one-way marginal tables.
+#
+DO K1 = 1:NLA
+  DO K2 = 1:NLB
+    LET K3 = (K1-1)*NLB*NLC + (K2-1)*NLC
+    LET ABT.K2(K1) = 0
+    DO K4 = 1:NLC
+      LET K5 = K3 + K4
+      LET ABT.K2[K1] = ABT.K2[K1] + OBS[K5]
+    ENDDO
+  ENDDO
+ENDDO
+DO K1 = 1:NLA
+  DO K2 = 1:NLC
+    LET K3 = (K1-1)*NLB*NLC + K2
+    LET ACT.K2[K1] = 0
+    DO K4 = 1:NLB
+      LET K5 = K3 + (K4-1)*NLC
+      LET ACT.K2[K1] = ACT.K2[K1] + OBS[K5]
+    ENDDO
+  ENDDO
+ENDDO
+DO K1 = 1:NLB
+  DO K2 = 1:NLC
+    LET K3 = (K1-1)*NLC + K2
+    LET BCT.K2[K1] = 0
+    DO K4 = 1:NLA
+      LET K5 = K3 + (K4-1)*NLB*NLC
+      LET BCT.K2[K1] = BCT.K2[K1] + OBS[K5]
+    ENDDO
+  ENDDO
+ENDDO 
+RSUM ABT.1-ABT.NLB AT
+RSUM BCT.1-BCT.NLC BT
+DO K1 = 1:NLC
+  LET CT[K1] = SUM(ACT.K1)
+ENDDO
+LET MT = SUM (OBS)
+#
+#  The following steps invoke the logistic regression program within
+#  Minitab to test the three-way interaction term.
+#
+IF NLA=2
+  Gzlm;
+    Nodefault;
+    Response VA ;
+    Categorical VB VC;
+    Terms VB VC;
+    Freq OBS;
+    Constant;
+    Binomial;
+      Logit;
+    Fits Scratch1.
+ Let Expect = 1 - Scratch1
+
+ #BLOGISTIC VA = VB VC;
+ #FREQUENCY OBS;
+ #FACTORS VB VC;
+ #LOGIT;
+ #EPROBABILITY SCRATCH1 EXPECT;
+ #BRIEF 0.
+  LET K2 = NLB*NLC
+  DO K1 = 1:K2
+    LET K3 = K1+K2
+    LET EXPECT[K3] = SCRATCH1[K1]
+  ENDDO
+ELSE
+  LET K1 = NLA-1
+  NLOGISTIC VA = VB VC;
+  FREQUENCY OBS;
+  FACTORS VB VC;
+  EPROBABILITY JUNK.1-JUNK.K1 EXPECT;
+  BRIEF 0.
+  DO K1 = 2:NLA
+    LET K2 = NLA-K1+1
+    LET K3 = (K1-1)*NLB*NLC 
+    LET K4 = NLB*NLC
+    DO K5 = 1:K4
+      LET K6 = K3+K5
+      LET EXPECT[K6] = JUNK.K2[K5]
+    ENDDO
+  ENDDO
+ENDIF
+DO K1 = 1:NCELLS
+  LET K2 = VB[K1]
+  LET K3 = VC[K1]
+  LET EXPECT[K1] = EXPECT[K1]*BCT.K3[K2]
+ENDDO
+LET DF[1]=(NLA-1)*(NLB-1)*(NLC-1)
+LET K1=DF[1]
+CALL TEST OBS EXPECT NCELLS K1 K2 K3
+LET G[1] = K2
+LET P[1] = K3
+#
+DO K1 = 1:NLA
+  DO K2 = 1:NLB
+    DO K3 = 1:NLC
+      LET K4 = (K1-1)*NLB*NLC + (K2-1)*NLC + K3
+      LET EXPECT[K4] = ACT.K3[K1]*BCT.K3[K2]/CT[K3]
+    ENDDO
+  ENDDO
+ENDDO
+LET DF[2] = (NLA-1)*(NLB-1)*NLC
+LET K1 = DF[2]
+CALL TEST OBS EXPECT NCELLS K1 K2 K3
+
+LET G[2] = K2
+LET P[2] = K3
+#
+DO K1 = 1:NLA
+  DO K2 = 1:NLB
+    DO K3 = 1:NLC
+      LET K4 = (K1-1)*NLB*NLC + (K2-1)*NLC + K3
+      LET EXPECT[K4] = ABT.K2[K1]*BCT.K3[K2]/BT[K2]
+    ENDDO
+  ENDDO
+ENDDO
+LET DF[3] = (NLA-1)*NLB*(NLC-1)
+LET K1 = DF[3]
+CALL TEST OBS EXPECT NCELLS K1 K2 K3
+LET G[3] = K2
+LET P[3] = K3
+#
+DO K1 = 1:NLA
+  DO K2 = 1:NLB
+    DO K3 = 1:NLC
+      LET K4 = (K1-1)*NLB*NLC + (K2-1)*NLC + K3
+      LET EXPECT[K4] = ABT.K2[K1]*ACT.K3[K1]/AT[K1]
+    ENDDO
+  ENDDO
+ENDDO
+LET DF[4] = NLA*(NLB-1)*(NLC-1)
+LET K1 = DF[4]
+CALL TEST OBS EXPECT NCELLS K1 K2 K3
+LET G[4] = K2
+LET P[4] = K3
+#
+DO K1 = 1:NLA
+  DO K2 = 1:NLB
+    DO K3 = 1:NLC
+      LET K4 = (K1-1)*NLB*NLC + (K2-1)*NLC + K3
+      LET EXPECT[k4] = AT[K1]*BCT.K3[K2]/MT
+    ENDDO
+  ENDDO
+ENDDO
+LET DF[5] = (NLA-1)*(NLB*NLC-1)
+LET K1 = DF[5]
+CALL TEST OBS EXPECT NCELLS K1 K2 K3
+LET G[5] = K2
+LET P[5] = K3
+#
+DO K1 = 1:NLA
+  DO K2 = 1:NLB
+    DO K3 = 1:NLC
+      LET K4 = (K1-1)*NLB*NLC + (K2-1)*NLC + K3
+      LET EXPECT[K4] = BT[K2]*ACT.K3[K1]/MT
+    ENDDO
+  ENDDO
+ENDDO
+LET DF[6] = (NLB-1)*(NLA*NLC-1)
+LET K1 = DF[6]
+CALL TEST OBS EXPECT NCELLS K1 K2 K3
+LET G[6] = K2
+LET P[6] = K3
+#
+DO K1 = 1:NLA
+  DO K2 = 1:NLB
+    DO K3 = 1:NLC
+      LET K4 = (K1-1)*NLB*NLC + (K2-1)*NLC + K3
+      LET EXPECT[K4] = CT[K3]*ABT.K2[K1]/MT
+    ENDDO
+  ENDDO
+ENDDO
+LET DF[7] = (NLC-1)*(NLA*NLB-1)
+LET K1 = DF[7]
+CALL TEST OBS EXPECT NCELLS K1 K2 K3
+LET G[7] = K2
+LET P[7] = K3
+#
+DO K1 = 1:NLA
+  DO K2 = 1:NLB
+    DO K3 = 1:NLC
+      LET K4 = (K1-1)*NLB*NLC + (K2-1)*NLC + K3
+      LET EXPECT[K4] = AT[K1]*BT[K2]*CT[K3]/(MT*MT)
+    ENDDO
+  ENDDO
+ENDDO
+LET DF[8] = NLA*NLB*NLC-NLA-NLB-NLC+2
+LET K1 = DF[8]
+CALL TEST OBS EXPECT NCELLS K1 K2 K3
+LET G[8] = K2
+LET P[8] = K3
+text g df ga dfa
+text p pa;
+   decimal 6.
+brief 2
+stack ("Model" "G" "DF" "P-VALUE") (MODEL GA DFA PA) (MODEL GA DFA PA)
+write MODEL GA DFA PA
+brief 0
+
+LET GT[1]=G[1]
+LET DFT[1]=DF[1]
+LET PT[1]=P[1]
+LET GT[2] = G[2]-G[1]
+LET DFT[2] = DF[2]-DF[1]
+LET K1 = GT[2]
+LET K2 = DFT[2]
+CDF K1 K3;
+CHISQUARE K2.
+LET PT(2) = 1-K3
+LET GT(3) = G(5)-G(3)
+LET DFT(3) = DF(5)-DF(3)
+LET K1 = GT(3)
+LET K2 = DFT(3)
+CDF K1 K3;
+CHISQUARE K2.
+LET PT(3) = 1-K3
+LET GT(4) = G(6)-G(4)
+LET DFT(4) = DF(6)-DF(4)
+LET K1 = GT(4)
+LET K2 = DFT(4)
+CDF K1 K3;
+CHISQUARE K2.
+LET PT(4) = 1-K3
+LET GT(5) = G(3)-G(1)
+LET DFT(5) = DF(3)-DF(1)
+LET K1 = GT(5)
+LET K2 = DFT(5)
+CDF K1 K3;
+CHISQUARE K2.
+LET PT(5) = 1-K3
+LET GT(6) = G(5)-G(2)
+LET DFT(6) = DF(5)-DF(2)
+LET K1 = GT(6)
+LET K2 = DFT(6)
+CDF K1 K3;
+CHISQUARE K2.
+LET PT(6) = 1-K3
+LET GT(7) = G(7)-G(4)
+LET DFT(7) = DF(7)-DF(4)
+LET K1 = GT(7)
+LET K2 = DFT(7)
+CDF K1 K3;
+CHISQUARE K2.
+LET PT(7) = 1-K3
+LET GT(8) = G(4)-G(1)
+LET DFT(8) = DF(4)-DF(1)
+LET K1 = GT(8)
+LET K2 = DFT(8)
+CDF K1 K3;
+CHISQUARE K2.
+LET PT(8) = 1-K3
+LET GT(9) = G(6)-G(2)
+LET DFT(9) = DF(6)-DF(2)
+LET K1 = GT(9)
+LET K2 = DFT(9)
+CDF K1 K3;
+CHISQUARE K2.
+LET PT(9) = 1-K3
+LET GT(10) = G(7)-G(3)
+LET DFT(10) = DF(7)-DF(3)
+LET K1 = GT(10)
+LET K2 = DFT(10)
+CDF K1 K3;
+CHISQUARE K2.
+LET PT(10) = 1-K3
+#
+TSET MODEL
+"               MODELS     TERMS"   
+"TERM     USED           DELETED"
+"ABC        [1]              None	"
+" AB          [2]-[1]        ABC	"
+" AB          [5]-[3]        ABC AC	"
+" AB          [6]-[4]        ABC BC	"
+" AC          [3]-[1]        ABC	"
+" AC          [5]-[2]        ABC AB	"
+" AC          [7]-[4]        ABC BC	"
+" BC          [4]-[1]        ABC	"
+" BC          [6]-[2]        ABC AB	"
+" BC          [7]-[3]        ABC AC	"
+end
+
+text gt gt 
+text dft dft
+text pt pt;
+  decimal   6.
+stack (" "  " "  " " ) ("G" "DF" "P-VALUE") (GT DFT PT) (GT DFT PT)
+brief 2
+write MODEL GT DFT PT
+print " * CAUTION *  A test of a single term is not valid if any other "
+print "                       significant term has been deleted from the models used. "
+ENDMTITLE
+MLABEL 100
+ENDMACRO
+#
+
+MACRO
+TEST O EX NC D GT PT
+MCOLUMN O EX 
+MCONSTANT NC D GT PT K1
+LET GT=0
+DO K1 = 1:NC
+  IF O(K1)=0
+    NEXT
+  ELSE
+    LET GT = GT + 2*O(K1)*LOGE(O(K1)/EX(K1))
+  ENDIF
+ENDDO
+CDF GT PT;
+CHISQUARE D.
+LET PT=1-PT
+ENDMACRO

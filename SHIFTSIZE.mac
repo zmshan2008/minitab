@@ -1,0 +1,90 @@
+MACRO
+#
+#      Name:  ShiftSize.MAC
+#    Author:  Keith Bower
+#   Version:  Mnitab 18
+#  This macro can be used to estimate the size of a shift exhibited in a
+#  CUSUM chart, and also an estimate of the shift in terms of the within-
+#  subgroup estimation of standard deviation.
+#     
+#  Suppose your data is in C2, the subgroup size is 5, and the target is 
+#  25.  You suspect that there is a process shift that starts in subgroup 
+#  19 and ends at subgroup 30.  To use the macro to quantify this shift,
+#  go to Edit > Command Line Editor and type the command
+#
+#  %shiftsize c2 5 25 19 30
+#
+#  Click on Submit Commands.
+#
+###########################################################################
+#
+#  Neither Minitab, Inc. nor the author(s) of this MACRO makes any claim 
+#  of or offers any Warranty whatsoever with regard to the accuracy of 
+#  this MACRO or its suitability for use.  Minitab, Inc. and the author(s)
+#  of this MACRO each hereby disclaims any Warranty and/or liability with 
+#  respect thereto. 
+#
+###########################################################################
+#
+# This macro was written by Keith M. Bower, Minitab Inc.
+# 
+#  INVESTIGATING SMALL SHIFTS WITH A CUSUM CHART
+#
+#     SUBMITTED BY KEITH M. BOWER
+# 
+#                     CODE 
+shiftsize c1 k19 k10 k12 k13 
+mconstant k11 k12 k13 k14 k15 k16 k19 k10
+mconstant k1 k2 k3 k20 k21 k22 k23 k24 k25 k26 k27 k28
+mcolumn c1 c6 c7 c8 c10 c11 temp1 temp2
+mcolumn c3001 c3002 c3003
+
+mreset
+noecho
+notitle
+brief 0
+endmtitle
+
+capa c1 k19;
+  Lspec 10;
+  Uspec 11;
+  Toler 6.0;
+  Within;
+  Overall;
+  nochart;
+  N c3001;
+  sdt c3002.
+
+let k1 = SUM(C3001)
+let k2 = SUM(C3002)
+let k28 = k1/k19
+
+set c8
+  1(1:k28/1)k19
+end
+
+Statistics c1;
+  By c8;
+  GValues c10;
+  Mean c11.
+Let c11 = c11 - k10
+Let c6 = PARS(c11)
+let k14 = abso(c6(k13) - c6(k12))
+let k15 = k13 - k12
+let k16 = k14/k15
+let k27 = (k16/k2)*100 
+tset temp1
+"Length of Period under Study        "
+"Total CUSUM Shift                           "
+"Average Shift                                    "
+"Within-Subgroup Sigma Estimate "
+"% of Estimated Sigma                      "
+end
+stack k15 k14 k16 k2 k27 temp2
+
+mtitle "CUSUM Shift Results";
+  notitle.
+brief 1
+write temp1 temp2
+endmtitle
+ENDMACRO

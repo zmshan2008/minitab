@@ -1,0 +1,74 @@
+macro
+
+############################################################### 
+#
+#
+#    Name:  TABLE.MAC 
+#  Author:  Andy Haines
+# Version:  Minitab 18
+#
+#  This macro produces this kind of table in the Session window:
+#
+#            Results   
+#  --------- ----------
+#  Mean      0.087635  
+#  StDev     0.722207  
+#  --------- ----------   
+#
+#  For example, if the data is in C1, choose Edit > Command Line Editor 
+#  and type 
+#
+#  %TABLE C1
+#
+#  Click on Submit Commands.
+#
+###########################################################################
+#
+#  Neither Minitab, Inc. nor the author(s) of this MACRO makes any claim 
+#  of or offers any Warranty whatsoever with regard to the accuracy of 
+#  this MACRO or its suitability for use.  Minitab, Inc. and the author(s)
+#  of this MACRO each hereby disclaims any Warranty and/or liability with 
+#  respect thereto. 
+#
+###########################################################################
+
+table x
+mcolumn x data labels
+mconstant tmp
+
+mreset
+noecho
+brief 0
+notitle
+endmtitle
+
+mean x tmp
+stack data tmp data
+
+stde x tmp
+stack data tmp data
+
+set labels;
+  format (a10).
+          
+----------
+Mean
+StDev
+----------
+end
+
+text data data
+
+let tmp = "----------"
+stack tmp data data
+stack data tmp data
+
+let tmp = "Results"
+stack tmp data data
+
+mtitle "Custom Table Macro Output";
+  notitle.
+brief 2
+write labels data
+endmtitle
+endmacro

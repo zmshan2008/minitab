@@ -1,0 +1,103 @@
+macro
+#       Macro:  MEDSMOOTH.MAC  
+#  Written by:  Cathy Akritas, January 2005
+#  
+#  This macro calculates a median smoother with a default span of 3.  The 
+#  first observation of the smoothed data is the median of the 1st 3 data 
+#  points (X1, X2, X3).  The 2nd observation of the smoothed data is the 
+#  median of the (X2, X3, X4).  The 3rd observation is the median of (X3, 
+#  X4, X5)...  Thus, the smoothed data represents a moving median of the 
+#  original data.  
+#  
+#  The input data is Data and the median smoothed data is in Smoothed.  
+#
+#   Data    Smooth
+#    5      11
+#   14      11            Note:  With the span = 3, the next to the last
+#   11       7                   smoothed value is the median of the last  
+#    7       7                   2 data values.  The last smoothed value
+#    6       6                   is equal to the last data value.
+#   13       5
+#    5       5
+#    1       8
+#    8       9
+#   10      10
+#
+#  Suppose you have data to be smoothed in C2, C3, and C4 and you want to 
+#  store the smoothed data in C5, C6, and C7.  Choose Edit > Command Line 
+#  Editor and type the commands
+#
+#  %medsmooth C2 - C4;
+#  store C5 - C7.
+#
+#  If you want to change the span to 5, so that each median is based on 5 
+#  data points, choose Edit > Command Line Edior and the commands
+#
+#  %medsmooth C2 - C4;
+#  store C5 - C7;
+#  span 5. 
+#
+#  NOTE:  The number of input columns listed after %medsmooth must be the 
+#  same number of columns given after store.  If you only have one column 
+#  of input data, then you would only have one storage column.  The 
+#  commands would look like
+#
+#         %medsmooth C1;
+#          store C2.
+#   
+###########################################################################
+#
+#  Neither Minitab, Inc. nor the author(s) of this MACRO makes any claim 
+#  of or offers any Warranty whatsoever with regard to the accuracy of 
+#  this MACRO or its suitability for use.  Minitab, Inc. and the author(s)
+#  of this MACRO each hereby disclaims any Warranty and/or liability with 
+#  respect thereto. 
+#
+###########################################################################
+
+medsmooth x.1 - x.n;
+  store y.1-y.z;
+  span w.
+
+mcolumn x.1 - x.n y.1 - y.z tmp
+mconstant w cnt end1 end2 i j m k 
+default w = 3 
+
+mreset
+notitle
+noecho
+brief 0
+endmtitle
+
+If n ne z
+  mtitle "Median Smoother Macro Error";
+    notitle.
+  brief 2
+  print "  ** Error **  The number of input columns does not match the number of storage columns"
+  print "                    Macro Exiting"
+  endmtitle
+  exit
+endif
+
+If span = 1 and w lt 2
+  mtitle "Median Smoother Macro Warning";
+    notitle.
+  brief 2
+  print "  NOTE:  The specified value of the span must be greater than or equal to 2"
+  print "              Span of 3 is being used in the smoothing algorithm now"
+  endmtitle
+  brief 0
+  let w = 3
+endif
+
+do k = 1:n
+  let cnt = n(x.k)          
+  do i = 1:cnt
+    let j = i+w-1
+    copy x.k tmp;
+      use i:j.
+    let m = median(tmp)
+    stack y.k m y.k
+  enddo
+enddo
+endmacro

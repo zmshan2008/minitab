@@ -1,0 +1,278 @@
+macro
+#
+#   Author:  Cathy Akritas
+#  Version:  Minitab 18
+#
+#  This macro plots a simple linear or quadratic regression line and displays 
+#  predicted values on the plot.  If the predicted values are for future values
+#  of X, then the predicted line and confidence bands are extended into the future.
+#
+#  This macro allows you to predict future values from a regression equation and 
+#  displays them as part of the fitted line plot.  Confidence interval and 
+#  prediction interval bands are drawn on the plot as well.  
+#
+#  Before running the macro, enter the new values of X into any empty column, 
+#  say C4.  Suppose that C1 contains X and that C2 contains the Response or Y.  
+#  To run the macro, go to Edit > Command Line Editor and type
+#
+#  %extend C2 C1 C4
+#
+#  Click on Submit commands. 
+#
+#  You can also specify the quadratic model (X and X^2) by using the subcommand 
+#  QUADRATIC subcommand.  Go to Edit > Command Line Editor and type
+#
+#  %extend C2 C1 C4;
+#  quadratic.  
+#  
+#  Click on Submit commands.  
+#
+#  You can change the confidence level from the default 95% by using the 
+#  CONFLEV subcommand. To display 98% confidence and prediction bands, go to 
+#  Edit > Command Line Editor and type
+#
+#  %extend C2 C1 C4;
+#  conflev 98.  
+#  
+#  Click on Submit commands.  
+#
+#  The 2 subcommands can be used together.  Go to Edit > Command Line Editor 
+#  and type
+#
+#  %extend C2 C1 C4;
+#  quadratic;
+#  conflev 98.
+#
+#  Click on Submit commands.
+#  
+############################################################################
+#
+#  Neither Minitab, Inc. nor the author(s) of this MACRO makes any claim 
+#  of or offers any Warranty whatsoever with regard to the accuracy of 
+#  this MACRO or its suitability for use.  Minitab, Inc. and the author(s)
+#  of this MACRO each hereby disclaims any Warranty and/or liability with 
+#  respect thereto. 
+#
+############################################################################
+
+extend y x newx;
+conflev cl;
+quadratic.
+
+mcolumn y x newx x1 y1 beta clo chi yall yhat group preds 
+mcolumn clo1 chi1 table tx ty plo phi plo1 phi1 table2 xnewa tmp1
+mconstant i j m yname xname eq slope1 ymax ymin xmax xmin rg cl cla
+mconstant slope2 fn1 fn2 fn3 cn cla2
+
+default cl = 95  
+
+mreset 
+brief 0
+noecho
+notitle
+endmtitle
+
+if cl < 1
+  let cl = c1*100
+endif
+kkname yname y
+kkname xname x
+
+let fn1 = concat(cl, "% CI")
+let fn2 = concat(cl, "% PI")
+  let fn3 = " "
+let j = n(x)
+let m = n(newx)
+tset group
+j("Actual") m("Predicted")
+end
+name group "Data"
+set y1
+m('*')
+end
+stack y y1 y1
+stack x newx x1
+
+if quadratic = 0
+  regress;
+    response y1;
+    continuous x1;
+    terms x1;
+    coeff beta;
+    confidence cl.
+
+  Predict y1;
+    Nodefault;
+    CPredictors x1;
+    PFITS Yhat;
+    CLIM clo - chi;
+    PLIM plo - phi.
+ 
+  if beta[2] < 0
+    let slope1 = -1*beta[2]
+    let eq = concat(yname, " = ", beta[1], " - ", slope1, xname)
+  else
+    let slope1 = beta[2]
+    let eq = concat(yname, " = ", beta[1], " + ", slope1, xname)
+  endif
+elseif quadratic = 1
+    regress;
+      response y1;
+      contin X1;
+      terms X1 X1*X1;
+    coeff beta;
+    confidence cl.
+
+  Predict y1;
+    Nodefault;
+    CPredictors x1;
+    PFITS Yhat;
+    CLIM clo - chi;
+    PLIM plo - phi.
+
+  let cn = n(beta)  
+  if cn = 3
+    if beta[2] < 0 and beta[3] < 0
+      let slope1 = -1*beta[2]
+      let slope2 = -1*beta[3]
+      let eq = concat(yname, " = ", beta[1], " - ", slope1, xname, " - ", slope2, xname, "**2")
+    elseif beta[2] < 0 and beta[3] >= 0 
+      let slope1 = -1*beta[2]
+      let slope2 = beta[3]
+      let eq = concat(yname, " = ", beta[1], " - ", slope1, xname, " + ", slope2, xname, "**2")
+    elseif beta[2] >= 0 and beta[3] < 0 
+      let slope1 = beta[2]
+      let slope2 = -1*beta[3]
+      let eq = concat(yname, " = ", beta[1], " + ", slope1, xname, " - ", slope2, xname, "**2")
+    elseif beta[2] >= 0 and beta[3] >= 0
+     let slope1 = beta[2]
+     let slope2 = beta[3]
+     let eq = concat(yname, " = ", beta[1], " + ", slope1, xname, " + ", slope2, xname, "**2")
+    endif
+  elseif cn = 2
+    if beta[2] < 0 and cn = 2 
+      let slope1 = -1*beta[2]
+      let eq = concat(yname, " = ", beta[1], " - ", slope1, xname)
+      let fn3 = concat(Xname, "**2 cannot be estimated and has been removed from the analysis")
+    elseif beta[2] >= 0 and cn = 2 
+      let slope1 = beta[2]
+      let eq = concat(yname, " = ", beta[1], " + ", slope1, xname)
+      let fn3 = concat(Xname, "**2 cannot be estimated and has been removed from the analysis")
+    endif
+  endif
+endif
+sort x1 y1 yhat clo chi plo phi group x1 y1 yhat clo chi plo phi group;
+  by x1.
+stack y1 yhat clo chi plo phi yall
+let rg = maxi(yall) - mini(yall)
+let ymax = maxi(yall) + .05*rg
+let ymin = mini(yall) - .05*rg
+let rg = maxi(x1) - mini(x1)
+let xmax = maxi(x1) + .05*rg
+let xmin = mini(x1) - .05*rg
+let y1 = if(y1 = '*', yhat, y1)
+let j = "Predicted"
+copy yhat clo chi plo phi preds clo1 chi1 plo1 phi1;
+  include;
+  where " group = j ".
+
+let preds = round(preds, 4)
+let clo1 = round(clo1, 4)
+let chi1 = round(chi1, 4)
+let plo1 = round(plo1, 4)
+let phi1 = round(phi1, 4)
+
+let table = concat( preds, "  (", clo1, ", ", Chi1, ")" )
+let table2 = concat("(", plo1, ", ", phi1, ")")
+let cla = concat("Pred Y    ", Cl, "%", " CI")
+let cla2 = concat(" ", Cl, "%", " PI")
+stack cla table table
+stack cla2 table2 table2
+text newX Xnewa
+stack xname Xnewa Xnewa
+let m = (m + 1)*2 + 1
+set tx
+  (.7575)m
+end
+do i = 1:m
+  let ty[i] = .62 - (i-1)*.04  
+enddo
+
+
+mtitle "Regression: Predicted Values and Intervals for New Observations";
+  notitle.
+brief 2
+write Xnewa table table2
+brief 0
+
+text preds tmp1
+stack "Pred Y" tmp1 tmp1
+let table2 = concat(tmp1, "    ", table2)
+stack table " " table2 table
+
+plot y1 * x1;
+  Data 0.13333 0.745 0.138 0.8385;
+  Legend .81 .95 .66 .85; 
+    section 1;
+    Chhide;
+  line .82 .7125 .84 .7125;
+    size 1.5;
+    type 2;
+    color 2;   
+    unit 0;
+  line .82 .75 .84 .75;
+    size 1.5;
+    type 1;
+    unit 0;
+  Line .82 .685  .84 .685;
+    size 1.5;
+    color 50;
+    type 3;
+    unit 0;
+  text .85 .7125 fn1;
+    unit 0;
+    psize 8;
+  text .85 .75 "Regression";
+    unit 0;
+    psize 8;
+  text .85 .685 fn2;
+    unit 0;
+    psize 8;
+  axlabel 1 xname;
+  axlabel 2 yname;
+  symbol group;
+  wtitle "Fitted Line Plot";
+  title "Fitted Line Plot";
+  subtitle eq;
+  nodtitle;
+  line x1 yhat;
+    size 1.25;
+  line x1 clo;
+    Type 2;
+    Color 2;
+    Size 1.25;
+  line x1 chi;
+    Type 2;
+    Color 2;
+    Size 1.25;
+  line x1 plo;
+    Type 3;
+    Color 50;
+    Size 1.25;
+  line x1 phi;
+    Type 3;
+    Color 50;
+    Size 1.25;
+  scale 1;
+    maxi xmax;
+    mini xmin;
+  scale 2;
+    mini ymin;
+    maxi ymax;
+  text tx ty table;
+    unit 0;
+    psize 8;
+  footnote fn3;
+    psize 8.
+endmtitle
+endmacro

@@ -1,0 +1,145 @@
+macro
+###########################################################################
+#
+#       Macro: HBINS.MAC
+#  Written by: Cathy Akritas, August 2002
+#     Version: Mnitab 18
+#
+#  This macro displays the frequency and percent of observations that fall 
+#  into the user specified intervals.  You can specify the same intervals 
+#  from a histogram to display a table of the interval endpoints and the 
+#  frequencies.  
+#
+#  Suppose the first interval of a histogram of your data in C1 has a 
+#  midpoint of 20.5, the last interval of your histogram has a midpoint of 
+#  40.5, and the increment between the midpoints is 2.  To run this macro, 
+#  choose Edit > Command Line Editor.  Type the command, 
+#
+#  %HBINS 20.5 40.5 2 C1
+#
+#  and click on Submit Commands.
+#
+#  The output in the Session Window will look something like
+#
+#  Row  Intervals    Frequencies   Percents
+#   1  19.5 to 21.5            8   10.6667
+#   2  21.5 to 23.5            7    9.3333
+#   3  23.5 to 25.5            5    6.6667
+#   4  25.5 to 27.5           13   17.3333
+#   5  27.5 to 29.5            6    8.0000
+#   6  29.5 to 31.5            4    5.3333
+#   7  31.5 to 33.5           11   14.6667
+#   8  33.5 to 35.5            2    2.6667
+#   9  35.5 to 37.5            7    9.3333
+#  10  37.5 to 39.5            8   10.6667
+#  11  39.5 to 41.5            4    5.3333
+#  12  Totals                 75  100.0000
+#
+#  Suppose you created a histogram where you specified the use of 
+#  cutpoints rather than midpoints, and the first interval starts at 20, 
+#  the last interval ends at 40 and the width of the intervals is 2.  To 
+#  get the table of the frequencies, choose Edit > Command Line Editor.  
+#  Type the command
+#
+#   %HBINS 20 40 2 C1;
+#   cutpoint.
+#
+#  The output in the Session Window will look something like 
+#
+# Row  Intervals  Frequencies   Percents
+#   1   20 to 22           11   14.6667
+#   2   22 to 24            5    6.6667
+#   3   24 to 26            8   10.6667
+#   4   26 to 28           12   16.0000
+#   5   28 to 30            3    4.0000
+#   6   30 to 32            6    8.0000
+#   7   32 to 34            9   12.0000
+#   8   34 to 36            5    6.6667
+#   9   36 to 38            6    8.0000
+#  10   38 to 40           10   13.3333
+#  11   Totals             75  100.0000 
+#
+#  The first argument after the %HBINS is always the smallest 
+#  midpoint/cutpoint, the second argument is always the largest 
+#  midpoint/cutpoint, the third argument is the increment and the last 
+#  argument is the column of data.  
+#
+#  Just as with MINITAB's histogram algorithm, observations that fall on 
+#  interval boundaries are placed into the interval to the right, with one 
+#  exception:  observations on the boundary of the interval that is 
+#  farthest to the right are placed in the last interval.
+#
+###########################################################################
+#
+#  Neither Minitab, Inc. nor the author(s) of this MACRO makes any claim 
+#  of or offers any Warranty whatsoever with regard to the accuracy of 
+#  this MACRO or its suitability for use.  Minitab, Inc. and the author(s)
+#  of this MACRO each hereby disclaims any Warranty and/or liability with 
+#  respect thereto. 
+#
+###########################################################################
+
+hbins lo hi inc x;
+cutpoint.
+mcolumn x Freqs bins binslo binshi to a Ints Percents
+mconstant lo hi inc cnt i j binlo binhi k1 total
+
+mreset
+noecho
+brief 0
+notitle
+endmtitle
+
+if cutpoint = 1
+  set bins 
+    lo:hi/inc
+  end
+else
+  let lo = lo - .5*inc
+  let hi = hi + .5*inc
+  set bins 
+    lo:hi/inc
+  end
+endif
+
+let cnt = n(bins) - 2
+
+do i = 1:cnt
+  let j = i+1
+  let binlo=bins(i)
+  let binhi=bins(j)
+  let Freqs(i) = sum((x ge binlo) and (x < binhi))
+enddo
+  
+let i = cnt + 1
+let j = i + 1
+let binlo=bins(i)
+let binhi=bins(j)
+let Freqs(i) = sum((x ge binlo) and (x le binhi))  
+let total = sum(freqs)
+let Freqs(j) = total
+ 
+copy bins binslo;
+omit j.
+
+copy bins binshi;
+omit 1.
+
+text binslo binslo
+text binshi binshi
+tset to
+  (" to ")i
+end
+concat binslo to a
+concat a binshi Ints
+kkset k1 "Totals"
+
+stack Ints k1 Ints
+let Percents = (Freqs*100)/total
+name Ints 'Intervals' Freqs 'Frequencies' 
+mtitle "Frequencies and Percents of the Data into Specified Intervals";
+  notitle.
+brief 2
+print Ints Freqs Percents
+endmtitle
+endmacro

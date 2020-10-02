@@ -1,0 +1,2377 @@
+macro
+#***********************************************************
+#                                                           
+# Macro:             MultDist.MAC                           
+# Version:           Minitab 18 -- Sept 2016
+# Date:              April 20, 2000
+# Revised:           April 02, 2004
+# Authors:           Mike Delozier & Steve Orlich           
+#                    Minitab Inc.                           
+#                    1829 Pine Hall Road                  
+#                    State College, PA  16801-3008
+#
+###########################################################################
+#
+#       Multiple Case Cook's Distance
+#          Command and Subcommands
+
+# MultDist Y.1 X.1-X.n  Specify your response in Y.1, predictors in X.1-X.n
+# noconstant            Specify to exclude the constant term in the model
+# nopair                Specify to supress all pairwise comparisons
+# triple                Specify to display all triple comparisons
+# sub1 a.1-a.b          Specify to get Cook's Distance for a subset of cases
+# sub2 c.1-c.d          Specify to get Cook's Distance for a subset of cases
+# sub3 e.1-e.f          Specify to get Cook's Distance for a subset of cases
+# sub4 g.1-g.h          Specify to get Cook's Distance for a subset of cases
+# sub5 j.1-j.k          Specify to get Cook's Distance for a subset of cases
+# threshold l           Specify a Cook's Distance threshold value
+# reportall             Select to report all the computed statistics
+# spairs AA.1-AA.3      Store Cook's Distances and case indices: all pairs 
+# striples AB.1-AB.4    Store Cook's Distances and case indices: all triples
+# noplots               Select to supress the diagnostic plots
+# hold one two          Select to create a fixed-pair effects plot
+#
+###########################################################################
+#
+#  Neither Minitab, Inc. nor the author(s) of this MACRO makes any claim 
+#  of or offers any Warranty whatsoever with regard to the accuracy of 
+#  this MACRO or its suitability for use.  Minitab, Inc. and the author(s)
+#  of this MACRO each hereby disclaims any Warranty and/or liability with 
+#  respect thereto. 
+#
+###########################################################################
+
+MultDist Y.1 X.1-X.n;
+noconstant;
+nopair;
+triple;
+sub1 a.1-a.b;
+sub2 c.1-c.d;
+sub3 e.1-e.f;
+sub4 g.1-g.h;
+sub5 j.1-j.k;
+threshold l;
+reportall;
+spairs AA.1-AA.3;
+striples AB.1-AB.4;
+hold one two;
+noplots.
+
+mcolumns Y.1 X.1-X.n AA.1-AA.3 AB.1-AB.4 CC.1 YY.1 XX.1-XX.n FF.1 GG.1 HH.1-HH.n
+mcolumns II.1 Bug JJ.1 KK.1-KK.500 LL.1 Cdis MM.1 NN.1 OO.1 PP.1 QQ.1 Defi RR.1
+mcolumns UU.1 SS.1 TT.1 VV.1 WW.1 ZZ.1 AAA.1 BBB.1 Defi1 CCC.1 GGG.1 DDD.1 EEE.1 
+mcolumns FFF.1 HHH.1 III.1 JJJ.1 LLL.1 MMM.1 NNN.1 OOO.1 PPP.1 QQQ.1 RRR.1 SSS.1
+mcolumns Tots TTT.1 UUU.1-UUU.10 Defi5 VVV.1 XXX.1 CCCC.1 HHHH.1 NNNN.1 YYY.1
+mcolumns DDDD.1 IIII.1 OOOO.1 ZZZ.1-ZZZ.10 EEEE.1-EEEE.10 JJJJ.1-JJJJ.10 
+mcolumns PPPP.1-PPPP.10 Defi6 Defi7 Defi8 Defi9 AAAA.1 FFFF.1 LLLL.1 QQQQ.1
+mcolumns RRRR.1-RRRR.10 TTTT.1 UUUU.1 SSSS.1 Otwo R1 New1 New2 New3 Mak Mak1
+mcolumns Last.1 Pllot Cpy Kellie.1-Kellie.2 Neil Done Mak2 Scrap Oper
+
+mconstants a.1-a.b c.1-c.d e.1-e.f g.1-g.h j.1-j.k l one two type err alert1
+mconstants m alert2 i p q r s t u v w z bg abb non1 ad count ae af ag ah non
+mconstants ai aj count2 ak al am an ao ap aq count4 ar as at au count6 av aw
+mconstants ax ay az aab err1 err2 steve aac aad aae aaf aag aah aai aaj aak 
+mconstants aal aan aam ref x1 y1 ref1 x2 y2 xxx1 com ba aaa1 bbb1 che none
+mconstants info show show1 ghi none10 apa1 apa2 apa3 what oops
+
+mmatrix a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12 a13 a14 a15 a16 a17 a18
+mmatrix a19 a20 a21 a22 a23 a24 a25 a26 a27 a28 a29 a30 a31 a32 a33 a34 
+mmatrix a35 a36 a37 a38 a39 a40 a41 a42 a43 a44 a45 a46 a47 a48 a100 
+default l = 1.00
+
+mreset
+brief 0
+noecho
+notitle
+endmtitle
+
+#********************************************************
+#   Check to make sure user specifies a distance measure to compute.
+
+IF nopair and not sub1 and not sub2 and not sub3 &
+  and not sub4 and not sub5 and not triple and not hold 
+  call Writerror 1
+  exit
+ENDIF
+
+#********************************************************
+#   Logic Check
+
+IF nopair and spairs
+  call Writerror 2
+  exit
+ENDIF
+
+IF not triple and striples
+  call Writerror 3
+  exit
+ENDIF
+
+#********************************************************
+#   Check the data type
+
+dtype Y.1 type
+
+IF type = 0 or type = 3
+  call Writerror 14
+  exit
+ELSEIF type = 10
+  call Writerror 4
+  exit
+ENDIF
+
+DO i = 1:n
+
+  dtype X.i type
+
+    IF type = 0 or type = 3
+        call Writerror 14
+      exit
+    ELSEIF type = 10
+      call Writerror 4
+      exit
+    ENDIF
+
+ENDDO
+
+#********************************************************
+#   Check for unequal column length
+
+count Y.1 err
+
+DO i = 1:n
+  let CC.1[i] = count(X.i)
+ENDDO
+
+stack err CC.1 CC.1
+
+IF stan(CC.1) <> 0
+  call Writerror 5
+  exit
+ENDIF
+
+#********************************************************
+#   Subsets error checks
+
+IF b > 10 
+  call Writerror 6
+  exit
+ENDIF
+
+IF d > 10
+  call Writerror 6
+  exit
+ENDIF
+
+IF f > 10
+  call Writerror 6
+  exit
+ENDIF
+
+IF h > 10
+  call Writerror 6
+  exit
+ENDIF
+
+IF k > 10
+  call Writerror 6
+  exit
+ENDIF
+
+#********************************************************
+#   Threshold error check
+
+dtype l what
+
+IF what = 0 or what = 3 or what = 10
+  call Writerror 16
+  exit
+ENDIF
+
+IF l <= 0
+  call Writerror 7
+  exit
+ENDIF
+
+#********************************************************
+#   Check for missing values in the data
+
+let alert1 = 0
+
+RNmissing Y.1 X.1-X.n Oper
+
+copy Y.1 X.1-X.n YY.1 XX.1-XX.n;
+omit Oper = 1:1000.         #1000 was chosen as an extreme upper limit
+
+count YY.1 q
+count Y.1 alert2
+
+IF q <> alert2
+  let alert1 = alert1 + 1
+ENDIF
+
+#********************************************************
+#   Determine the number of parameters
+
+IF noconstant
+
+  copy n r
+
+ELSE                    
+
+  let r = n+1
+
+ENDIF
+
+Name r 'Parameters:'
+
+#********************************************************
+#   MSE check, triple, nopair
+
+IF q > 500
+  call Writerror 13
+  exit
+ENDIF
+
+IF q <= r
+  call Writerror 8
+  exit
+ENDIF
+
+IF q > 30 and triple
+  call Writerror 9
+  exit
+ENDIF
+
+IF q > 60 and not nopair
+  call Writerror 10
+  exit
+ENDIF
+
+
+#********************************************************
+#   Subset Error Check
+
+IF sub1
+
+  copy a.1-a.b SSS.1                        #Copy subset into column
+  sort SSS.1 SSS.1;
+  by SSS.1.
+
+  dtype SSS.1 type
+
+    IF type = 0 or type = 1 or type = 3
+      call Writerror 11
+      exit
+    ENDIF
+
+  max SSS.1 err1
+  min SSS.1 err2
+
+    IF err1 < 0 or err1 = 0 or err1 > q or err2 < 0 or err2 = 0 or err2 > q
+      call Writerror 11
+      exit
+    ENDIF
+
+  stat;
+  by SSS.1;
+  N tots.
+
+  count tots steve
+
+    IF steve <> b
+      call Writerror 12
+      exit
+    ENDIF
+
+ENDIF
+
+IF sub2
+
+  copy c.1-c.d XXX.1                    #Copy subset into column
+  sort XXX.1 XXX.1;
+  by XXX.1.
+
+  dtype XXX.1 type
+
+    IF type = 0 or type = 1 or type = 3
+      call Writerror 11
+      exit
+    ENDIF
+
+  max XXX.1 err1
+  min XXX.1 err2
+
+    IF err1 < 0 or err1 = 0 or err1 > q or err2 < 0 or err2 = 0 or err2 > q
+      call Writerror 11
+      exit
+    ENDIF
+
+  stat;
+  by XXX.1;
+  N tots.
+
+  count tots steve
+
+    IF steve <> d
+      call Writerror 12
+      exit
+    ENDIF
+
+ENDIF
+
+IF sub3
+
+  copy e.1-e.f CCCC.1                   #Copy subset into column
+  sort CCCC.1 CCCC.1;
+  by CCCC.1.
+
+  dtype CCCC.1 type
+
+    IF type = 0 or type = 1 or type = 3
+      call Writerror 11
+      exit
+    ENDIF
+
+  max CCCC.1 err1
+  min CCCC.1 err2
+
+    IF err1 < 0 or err1 = 0 or err1 > q or err2 < 0 or err2 = 0 or err2 > q
+      call Writerror 11
+      exit
+    ENDIF
+
+  stat;
+  by CCCC.1;
+  N tots.
+
+  count tots steve
+
+    IF steve <> f
+      call Writerror 12
+      exit
+    ENDIF
+
+ENDIF
+
+IF sub4
+
+  copy g.1-g.h HHHH.1                   #Copy subset into column
+  sort HHHH.1 HHHH.1;
+  by HHHH.1.
+
+  dtype HHHH.1 type
+
+    IF type = 0 or type = 1 or type = 3
+      call Writerror 11
+      exit
+    ENDIF
+
+  max HHHH.1 err1
+  min HHHH.1 err2
+
+    IF err1 < 0 or err1 = 0 or err1 > q or err2 < 0 or err2 = 0 or err2 > q
+      call Writerror 11
+      exit
+    ENDIF
+
+  stat;
+  by HHHH.1;
+  N tots.
+
+  count tots steve
+
+    IF steve <> h
+      call Writerror 12
+      exit
+    ENDIF
+
+ENDIF
+
+IF sub5
+
+  copy j.1-j.k NNNN.1                   #Copy subset into column
+  sort NNNN.1 NNNN.1;
+  by NNNN.1.
+
+  dtype NNNN.1 type
+
+    IF type = 0 or type = 1 or type = 3
+      call Writerror 11
+      exit
+    ENDIF
+
+  max NNNN.1 err1
+  min NNNN.1 err2
+
+    IF err1 < 0 or err1 = 0 or err1 > q or err2 < 0 or err2 = 0 or err2 > q
+      call Writerror 11
+      exit
+    ENDIF
+
+  stat;
+  by NNNN.1;
+  N tots.
+
+  count tots steve
+
+    IF steve <> k
+      call Writerror 12
+      exit
+    ENDIF
+
+ENDIF
+
+#********************************************************
+#   Hold subcommand error check
+
+IF hold
+
+  copy one two otwo
+  dtype otwo type
+
+    IF type = 0 or type = 1 or type = 3
+      call Writerror 11
+      exit
+    ENDIF
+
+  max otwo err1
+  min otwo err2
+
+    IF err1 < 0 or err1 = 0 or err1 > q or err2 < 0 or err2 = 0 or err2 > q
+      call Writerror 11
+      exit
+    ENDIF
+
+  stat;
+  by otwo;
+  N tots.
+
+  count tots steve
+
+    IF steve <> 2
+      call Writerror 12
+      exit
+    ENDIF
+
+ENDIF
+
+#********************************************************
+#   Conversion Numeric to Text
+
+copy r FF.1
+text FF.1 FF.1
+copy FF.1 r
+
+#********************************************************
+#   Threshold value
+
+Name l 'Threshold value:'
+let GG.1[1] = l         #Make 2 decimal places for l
+let GG.1[2] = 2.55
+text GG.1 GG.1
+let l = GG.1[1]
+
+#********************************************************
+#   Store the name of the Y column
+
+kkname s Y.1                
+kkset t " "
+kkcat t s t
+name t 'Response:'
+
+#********************************************************
+#   Store the name of the X column(s)
+
+Mtitle "Multiple Case Cook's Distance";
+  notitle.   
+
+IF n = 1                
+  kkname u X.1
+  kkset v " "
+  kkcat v u v
+  name v 'Predictor:'
+  
+    IF reportall
+
+      brief 2
+      Print "Model Information"                        #Print the Model information
+      Print "-----------------"
+      print t 
+      print v
+      print r
+      print "-----------------"
+      brief 0
+
+    ELSE
+
+      brief 2                
+      print "Model Information"
+      print "------------------------"
+      print t 
+      print v
+      print r
+      print l
+      print "------------------------ "
+      brief 0
+
+    ENDIF 
+ELSE
+
+    DO i = 1:n
+
+        IF i < n
+
+                  kkname w X.i
+                  kkset z " , "
+                  kkcat w z w
+          copy w HH.i
+
+        ELSE
+
+          kkname w X.i
+                  copy w HH.i
+
+        ENDIF
+
+    ENDDO
+
+let II.1[1] = 1
+code (1) "Predictors:   " II.1 II.1
+
+    IF n > 5                #abbreviate names of predictors if n > 5
+      kkset bg "..."
+      copy bg Bug
+      conc II.1 HH.1-HH.4 Bug JJ.1
+
+    ELSE
+      conc II.1 HH.1-HH.n JJ.1
+
+    ENDIF
+
+    IF reportall
+
+      brief 2
+      print "Model Information"
+      print "-----------------"
+      print t 
+      print JJ.1;
+      format(A80). 
+      print r
+      print "-----------------"
+      brief 0
+
+    ELSE
+
+      brief 2
+      print "Model Information"
+      print "------------------------"
+      print t 
+      print JJ.1;
+      format(A80). 
+      print r
+      print l
+      print "------------------------"
+      brief 0
+
+    ENDIF
+
+ENDIF
+endmtitle
+
+#********************************************************
+#   Conversions from Text to Numeric data
+
+numeric FF.1 FF.1               #Parameters     
+copy FF.1 r
+
+numeric GG.1 GG.1               #Threshold
+let l = GG.1[1]
+
+#********************************************************
+#   Matrices
+
+IF noconstant                   #No constant case
+
+  copy XX.1-XX.n a1             #X
+  transpose a1 a2               #XT
+  multiply a2 a1 a3             #XTX
+  invert a3 a4                  #(XTX)inverse
+  multiply a1 a4 a5             #X(XTX)inverse
+  multiply a5 a2 a6             #X{(XTX)inverse}XT  HAT matrix
+  copy a6 KK.1-KK.q             #Copy the HAT vectors into columns
+
+  Regression;
+    response YY.1;
+    contin XX.1-XX.n;
+    terms XX.1-XX.n;          
+    noconstant;
+    nodefault;
+    residuals LL.1;             #Store the Residuals and the MSE  
+    cookd Cdis;
+    mse abb.
+
+ELSE                        #Constant case
+
+  set MM.1                  #Create the constant vector Xo
+  q(1)
+  end
+
+  copy MM.1 XX.1-XX.n a1            #X
+  transpose a1 a2               #XT
+  multiply a2 a1 a3             #XTX
+  invert a3 a4                  #(XTX)inverse
+  multiply a1 a4 a5             #X(XTX)inverse
+  multiply a5 a2 a6             #X{(XTX)inverse}XT  HAT matrix
+  copy a6 KK.1-KK.q             #Copy the HAT vectors into columns
+
+  Regression;
+    response YY.1; 
+    continuous XX.1-XX.n;
+    terms XX.1-XX.n;
+    residuals LL.1;
+    cookd Cdis;
+    mse abb.
+
+ENDIF
+
+#********************************************************
+#   Allpairwise Comparisons
+  
+IF not nopair
+
+  let non1 = 0                      #Count for eigenvalues
+
+  set NN.1                      #Create 2*2 I matrix
+  2(1)
+  end
+
+  diagonal NN.1 a7
+
+  let ad = q-1
+  let count = 0                     #Count for loop
+
+    DO ae = 1:ad                    #Extract appropriate subset residual
+          let af = ae+1                 #vector and 2*2 minor of HAT matrix
+        
+        DO ag = af:q
+          let count = count+1 
+              let OO.1[1] = LL.1[ae]
+          let OO.1[2] = LL.1[ag]
+          let KK.ae = round(KK.ae,10)
+          let KK.ag = round(KK.ag,10)
+          let PP.1[1] = KK.ae[ae]
+          let PP.1[2] = KK.ae[ag]
+          let QQ.1[1] = KK.ag[ae]
+          let QQ.1[2] = KK.ag[ag]
+
+              copy OO.1 a8              #Matrix algebra for Cook's Distance
+          transpose a8 a9
+          copy PP.1 QQ.1 a10
+          subtract a10 a7 a11
+          eigen a11 defi a100
+
+                DO i = 1:2          #Check the eigenvalues to see if invertible.
+        
+                IF defi[i] < .00001 
+                  let non1 = non1+1
+                  let ah = '*'
+                  goto 20
+                ENDIF
+
+                ENDDO
+
+          invert a11 a11
+          multiply a9 a11 a12
+          multiply a12 a10 a12
+          multiply a12 a11 a12
+          multiply a12 a8 a12   
+          copy a12 RR.1
+          let ah = RR.1[1]
+          let ah = ah/(r*abb)   
+
+          mlabel 20
+          let UU.1[count] = ah      #Cook's Distance
+              let SS.1[count] = ae      #Index i
+          let TT.1[count] = ag      #Index j
+
+        ENDDO
+
+    ENDDO
+
+    IF non1 = count
+      Mtitle  "Multiple Case Cook's Distance";
+        notitle.
+      brief 2
+      Print " ** Every case pair produces rank deficiency. **"
+      Print " ** Cook's distance for case pairs cannot be calculated. **"
+      brief 0
+    ENDIF
+
+ENDIF
+
+#********************************************************
+#   All case triples
+
+IF triple
+
+  let non = 0                       #Count for eigenvalues
+
+  set VV.1                          #Create 3*3 I matrix
+  3(1)
+  end
+
+  diagonal VV.1 a13
+
+  let ai = q-2
+  let aj = q-1
+  let count2 = 0                        #Count for loop
+
+    DO ak = 1:ai                    #Extract appropriate subset residual
+          let al = ak+1                 #vector and 3*3 minor of HAT matrix
+
+        DO am = al:aj
+          let an = am+1
+        
+            DO ao = an:q
+              let count2 = count2+1
+              let WW.1[1] = LL.1[ak]
+              let WW.1[2] = LL.1[am]
+              let WW.1[3] = LL.1[ao]
+              let KK.ak = round(KK.ak,10)
+              let KK.am = round(KK.am,10)
+              let KK.ao = round(KK.ao,10)
+              let ZZ.1[1] = KK.ak[ak]
+              let ZZ.1[2] = KK.ak[am]
+              let ZZ.1[3] = KK.ak[ao]
+              let AAA.1[1] = KK.am[ak]
+              let AAA.1[2] = KK.am[am]
+              let AAA.1[3] = KK.am[ao]
+              let BBB.1[1] = KK.ao[ak]
+              let BBB.1[2] = KK.ao[am]
+              let BBB.1[3] = KK.ao[ao]
+
+              copy WW.1 a14         #Matrix algebra for Cook's Distance
+              transpose a14 a15
+              copy ZZ.1 AAA.1 BBB.1 a16
+              subtract a16 a13 a17  
+              eigen a17 defi1 a100
+
+                DO i = 1:3          #Check eigenvalues to see if invertible
+        
+                    IF defi1[i] < .00001
+                          let non = non+1
+                          let ap = '*'
+                          goto 25
+                    ENDIF
+
+                    ENDDO
+          
+              invert a17 a17
+              multiply a15 a17 a18  
+              multiply a18 a16 a18
+              multiply a18 a17 a18
+              multiply a18 a14 a18
+              copy a18 CCC.1
+              let ap = CCC.1[1]
+              let ap = ap/(r*abb)  
+
+              mlabel 25
+              let GGG.1[count2] = ap        #Cook's Distance
+              let DDD.1[count2] = ak            #Index m
+              let EEE.1[count2] = am        #Index n
+              let FFF.1[count2] = ao            #Index o
+          
+            ENDDO
+
+        ENDDO
+
+    ENDDO
+
+    IF non = count2
+      mtitle "Multiple Case Cook's Distance" 
+      brief 2
+      Print "** Every case triple produces rank deficiency. **"
+      Print "** Cook's distance for case triples cannot be calculated. **"
+      endmtitle
+      brief 0
+    ENDIF
+
+ENDIF
+
+#********************************************************
+#   Check to see if Dij < threshold (pairs)
+
+IF not reportall  
+    
+    IF not nopair
+
+        IF non1~=count          #Every case isn't rank deficient
+
+          count UU.1 aq
+          let count4 = 0
+
+            DO i = 1:aq
+
+                IF UU.1[i] < l
+                          let count4 = count4+1
+                ENDIF
+
+            ENDDO
+
+        ENDIF
+
+    ENDIF
+
+ENDIF
+
+#********************************************************
+#   Report the results for Allpair
+Mtitle "Multiple Case Cook's Distance";
+  notitle. 
+
+IF not nopair 
+
+    IF non1~=count
+
+        IF reportall
+
+          count UU.1 aq
+          text SS.1 SS.1
+          text TT.1 TT.1
+
+            DO i = 1:aq
+              kkset ar " , "
+              let as = SS.1[i]
+                      let at = TT.1[i]
+              kkcat as ar as
+              kkcat as at au
+              let HHH.1[i] = au
+            ENDDO
+        
+          brief 2
+              Print " *** Cook's Distance for Case Pairs ***"
+              Print "     Cases        Cook's Distance "
+              Write HHH.1 UU.1;
+              format (5X,A10,8X,F5.2).
+              
+          brief 0
+
+        ELSE
+
+            IF count4 = aq      
+                      brief 2
+                      Print " "
+                      Print " ** There are no influential case pairs. **"
+                      Print " "
+              brief 0
+    
+                ELSE
+                  copy SS.1 III.1
+                      copy TT.1 JJJ.1
+                      copy UU.1 LLL.1
+
+                  mlabel 30
+                  count LLL.1 aq
+
+                DO i = 1:aq
+
+                    IF LLL.1[i] < l
+                      delete i III.1 JJJ.1 LLL.1
+                              goto 30
+                    ENDIF
+
+                ENDDO
+
+              text III.1 III.1
+                  text JJJ.1 JJJ.1
+
+                    DO i = 1:aq
+                          kkset ar " , "
+                          let as = III.1[i]
+                          let at = JJJ.1[i]
+                          kkcat as ar as
+                          kkcat as at au
+                          let HHH.1[i] = au
+                ENDDO
+
+              brief 2
+                      print " "
+                      Print " *** Cook's Distance for Case Pairs ***"
+                      Print " "
+                      Print "      Cases        Cook's Distance     "
+                      Write HHH.1 LLL.1;
+                      format (5X,A10,8X,F5.2).
+              brief 0
+
+                ENDIF
+
+        ENDIF
+
+        IF non1 > 0                 #Eigenvalue counter
+              brief 2
+              Print " '*': Rank deficient case pair"
+              Print " "
+              brief 0
+        ENDIF
+
+    ENDIF
+
+ENDIF
+
+#********************************************************
+#   Conversion from Text to Numeric
+
+IF not nopair
+
+    IF reportall
+      Numeric SS.1 SS.1
+      Numeric TT.1 TT.1
+    ENDIF
+
+ENDIF
+
+#******************************************************** 
+#   Store allpair comparisons
+
+IF spairs 
+
+    IF non1~=count
+
+          copy SS.1 AA.1
+          copy TT.1 AA.2
+          copy UU.1 AA.3
+
+          Name AA.3 'C_Distance(pairs)'
+          Name AA.2 'Row j'
+          Name AA.1 'Row i'
+
+    ENDIF
+
+ENDIF
+
+#*********************************************************
+#   Check to see if Dij < threshold (triples)
+
+IF not reportall 
+
+    IF triple 
+
+        IF non~=count2          #Eigenvalue counter
+
+          count GGG.1 ar
+                  let count6 = 0
+
+            DO i = 1:ar
+
+                IF GGG.1[i] < l
+                  let count6 = count6+1
+                ENDIF
+
+            ENDDO
+
+        ENDIF
+
+    ENDIF
+
+ENDIF
+
+#*********************************************************
+#   Report the results for Alltriples
+
+IF triple 
+
+    IF non~=count2
+
+        IF reportall
+
+          count GGG.1 av
+          text DDD.1 DDD.1
+          text EEE.1 EEE.1
+          text FFF.1 FFF.1
+
+            DO i = 1:av
+                  kkset aw " , "
+                  let ax = DDD.1[i]
+                      let ay = EEE.1[i]
+                  let az = FFF.1[i]
+                  kkcat ax aw ax
+                  kkcat ax ay ax
+                  kkcat ax aw ax
+                  kkcat ax az ax
+                  let MMM.1[i] = ax
+            ENDDO
+        
+          brief 2
+          Print " "
+              Print " *** Cook's Distance for Case Triples ***"
+              Print "
+              Print "          Cases        Cook's Distance     "
+              Write MMM.1 GGG.1;
+              format (5X,A13,8X,F5.2).
+          brief 0
+
+        ELSE
+
+            IF count6 = ar  
+    
+                      brief 2
+                      Print " "
+                      Print " ** There are no influential case triples. **"
+                      Print " "
+              brief 0
+    
+                ELSE
+    
+                  copy DDD.1 NNN.1
+                      copy EEE.1 OOO.1
+                      copy FFF.1 PPP.1
+                  copy GGG.1 QQQ.1
+
+                  mlabel 35
+                  count QQQ.1 aab
+
+                DO i = 1:aab
+
+                    IF QQQ.1[i] < l
+                      delete i NNN.1 OOO.1 PPP.1 QQQ.1
+                              goto 35
+                    ENDIF
+
+                ENDDO
+
+                          text NNN.1 NNN.1
+                  text OOO.1 OOO.1
+                  text PPP.1 PPP.1
+
+                    DO i = 1:aab
+                      kkset aw " , "
+                      let ax = NNN.1[i]
+                              let ay = OOO.1[i]
+                      let az = PPP.1[i]
+                      kkcat ax aw ax
+                      kkcat ax ay ax
+                      kkcat ax aw ax
+                      kkcat ax az ax
+                      let MMM.1[i] = ax
+                    ENDDO
+
+                  brief 2
+                  Print " "
+                      Print " *** Cook's Distance for Case Triples ***"
+                      Print " "
+                      Print "          Cases        Cook's Distance     "
+                      Write MMM.1 QQQ.1;
+                      format (5X,A13,8X,F5.2).
+              brief 0
+
+            ENDIF
+
+        ENDIF
+
+        IF non > 0 
+                  brief 2
+                  Print " '*': Rank deficient case triple"
+              Print " "
+          brief 0
+        ENDIF
+
+    ENDIF
+
+ENDIF
+
+#********************************************************
+#   Conversion from Text to Numeric
+
+IF triple
+
+    IF reportall
+      Numeric DDD.1 DDD.1
+      Numeric EEE.1 EEE.1
+      Numeric FFF.1 FFF.1
+    ENDIF
+
+ENDIF
+
+#*********************************************************
+#   Store alltriple comparisons
+
+IF striples 
+
+    IF non~=count2
+
+          copy DDD.1 AB.1
+          copy EEE.1 AB.2
+          copy FFF.1 AB.3
+          copy GGG.1 AB.4
+
+          Name AB.4 'C_Distance(triples)'
+          Name AB.3 'Row o'
+          Name AB.2 'Row n'
+          Name AB.1 'Row m'
+
+    ENDIF
+
+ENDIF
+
+#*********************************************************
+#   Subsets     
+
+IF sub1
+
+  set RRR.1                         #identity matrix
+  b(1)
+  end
+
+  diagonal RRR.1 a19                        #Extract appropriate subset residual
+
+    DO i = 1:b                      #Extract appropriate subset residual
+      let aac = SSS.1[i]                    #vector and b*b minor of HAT matrix
+
+      let TTT.1[i] = LL.1[aac]
+
+        DO aad = 1:b
+              let aae = SSS.1[aad]
+          let KK.aac = round(KK.aac,10)
+              let UUU.i[aad] = KK.aac[aae]
+            ENDDO
+
+    ENDDO
+
+  copy TTT.1 a20                        #Matrix algebra for Cook's Distance
+  transpose a20 a21
+  copy UUU.1-UUU.b a22
+  subtract a22 a19 a23
+  eigen a23 defi5 a100
+
+    DO i = 1:b
+        
+        IF defi5[i] < .00001
+          let aaf = '*'
+          goto 40
+        ENDIF
+
+    ENDDO
+
+  invert a23 a23
+  multiply a21 a23 a24
+  multiply a24 a22 a24
+  multiply a24 a23 a24
+  multiply a24 a20 a24
+  copy a24 VVV.1
+  let aaf = VVV.1[1]
+  let aaf = aaf/(r*abb)
+
+  mlabel 40
+  copy aaf VVV.1
+  erase aac aad aae TTT.1
+
+ENDIF
+      
+IF sub2
+
+  set RRR.1
+  d(1)
+  end
+
+  diagonal RRR.1 a25                    #Extract appropriate subset residual
+
+    DO i = 1:d                      #Extract appropriate subset residual
+      let aac = XXX.1[i]                #vector and d*d minor of HAT matrix
+
+      let YYY.1[i] = LL.1[aac]
+
+        DO aad = 1:d
+              let aae = XXX.1[aad]
+          let KK.aac = round(KK.aac,10)
+              let ZZZ.i[aad] = KK.aac[aae]
+            ENDDO
+
+    ENDDO
+
+  copy YYY.1 a26                        #Matrix algebra for Cook's Distance
+  transpose a26 a27
+  copy ZZZ.1-ZZZ.d a28
+  subtract a28 a25 a29
+  eigen a29 defi6 a100
+
+    DO i = 1:d
+        
+        IF defi6[i] < .00001
+          let aag = '*'
+          goto 45
+        ENDIF
+
+    ENDDO
+
+  invert a29 a29
+  multiply a27 a29 a30
+  multiply a30 a28 a30
+  multiply a30 a29 a30
+  multiply a30 a26 a30
+  copy a30 AAAA.1
+  let aag = AAAA.1[1]
+  let aag = aag/(r*abb)
+
+  mlabel 45
+  copy aag AAAA.1
+  erase aac aad aae
+
+ENDIF
+
+IF sub3
+
+  set RRR.1
+  f(1)
+  end
+
+  diagonal RRR.1 a31                    #Extract appropriate subset residual
+
+    DO i = 1:f                      #Extract appropriate subset residual
+      let aac = CCCC.1[i]               #vector and f*f minor of HAT matrix
+
+      let DDDD.1[i] = LL.1[aac]
+
+        DO aad = 1:f
+              let aae = CCCC.1[aad]
+          let KK.aac = round(KK.aac,10)
+              let EEEE.i[aad] = KK.aac[aae]
+            ENDDO
+
+    ENDDO
+
+  copy DDDD.1 a32                       #Matrix algebra for Cook's Distance
+  transpose a32 a33
+  copy EEEE.1-EEEE.f a34
+  subtract a34 a31 a35
+  eigen a35 defi7 a100
+
+    DO i = 1:f
+
+        IF defi7[i] < .00001
+          let aah = '*'
+          goto 50
+        ENDIF
+
+    ENDDO
+
+  invert a35 a35
+  multiply a33 a35 a36
+  multiply a36 a34 a36
+  multiply a36 a35 a36
+  multiply a36 a32 a36
+  copy a36 FFFF.1
+  let aah = FFFF.1[1]
+  let aah = aah/(r*abb)
+
+  mlabel 50
+  copy aah FFFF.1
+  erase aac aad aae
+
+ENDIF
+
+IF sub4
+
+  set RRR.1
+  h(1)
+  end
+
+  diagonal RRR.1 a37                    #Extract appropriate subset residual
+      
+    DO i = 1:h                      #Extract appropriate subset residual
+      let aac = HHHH.1[i]               #vector and h*h minor of HAT matrix
+
+      let IIII.1[i] = LL.1[aac]
+
+        DO aad = 1:h
+              let aae = HHHH.1[aad]
+          let KK.aac = round(KK.aac,10)
+              let JJJJ.i[aad] = KK.aac[aae]
+            ENDDO
+
+    ENDDO
+
+  copy IIII.1 a38                       #Matrix algebra for Cook's Distance
+  transpose a38 a39
+  copy JJJJ.1-JJJJ.h a40
+  subtract a40 a37 a41
+  eigen a41 defi8 a100
+
+    DO i = 1:h
+        
+        IF defi8[i] < .00001
+          let aai = '*'
+          goto 55
+        ENDIF
+
+    ENDDO
+
+  invert a41 a41
+  multiply a39 a41 a42
+  multiply a42 a40 a42
+  multiply a42 a41 a42
+  multiply a42 a38 a42
+  copy a42 LLLL.1
+  let aai = LLLL.1[1]
+  let aai = aai/(r*abb)
+
+  mlabel 55
+  copy aai LLLL.1
+  erase aac aad aae
+
+ENDIF
+
+IF sub5
+
+  set RRR.1
+  k(1)
+  end
+
+  diagonal RRR.1 a43                    #Extract appropriate subset residual
+
+    DO i = 1:k                      #Extract appropriate subset residual
+      let aac = NNNN.1[i]               #vector and k*k minor of HAT matrix
+
+      let OOOO.1[i] = LL.1[aac]
+
+        DO aad = 1:k
+              let aae = NNNN.1[aad]
+          let KK.aac = round(KK.aac,10)
+              let PPPP.i[aad] = KK.aac[aae]
+            ENDDO
+
+    ENDDO
+
+  copy OOOO.1 a44                       #Matrix algebra for Cook's Distance
+  transpose a44 a45
+  copy PPPP.1-PPPP.k a46
+  subtract a46 a43 a47
+  eigen a47 defi9 a100
+
+    DO i = 1:k
+        
+        IF defi9[i] < .00001
+          let aaj = '*'
+          goto 60
+        ENDIF
+
+    ENDDO
+
+  invert a47 a47
+  multiply a45 a47 a48
+  multiply a48 a46 a48
+  multiply a48 a47 a48
+  multiply a48 a44 a48
+  copy a48 QQQQ.1
+  let aaj = QQQQ.1[1]
+  let aaj = aaj/(r*abb)
+
+  mlabel 60
+  copy aaj QQQQ.1
+  erase aac aad aae
+
+ENDIF
+
+#********************************************************
+#   Report results for the subsets
+
+IF sub1 or sub2 or sub3 or sub4 or sub5
+  brief 2
+  Print " "
+  Print " *** Cook's Distance for a Subset ***"
+  brief 0
+ENDIF
+
+IF sub1
+  text SSS.1 SSS.1
+  let VVV.1[2] = 2.55
+  let VVV.1 = round(VVV.1, 2)
+  text VVV.1 VVV.1;
+  missing "*".
+  delete 2 VVV.1
+
+    DO i = 1:b
+    
+        IF i < b
+          kkset aak ", "
+          let aal = SSS.1[i]
+          kkcat aal aak aam
+          let RRRR.i = aam
+
+        ELSE
+          kkset aan "   "
+          let aal = SSS.1[i]
+          kkcat aal aan aal
+          copy aal RRRR.i 
+
+        ENDIF
+
+    ENDDO
+
+  let TTTT.1[1] = 1
+  let UUUU.1[1] = 1
+  code (1) "Cases:  " TTTT.1 TTTT.1
+  code (1) "Cook's Distance:  " UUUU.1 UUUU.1
+
+  conc TTTT.1 RRRR.1-RRRR.b UUUU.1 VVV.1 SSSS.1
+  brief 2
+  Write SSSS.1;
+  format (5X,A80).
+  brief 0
+
+  erase TTTT.1 UUUU.1 RRRR.1-RRRR.b SSSS.1 aak aal aam aan
+
+ENDIF
+
+IF sub2
+  text XXX.1 XXX.1
+  let AAAA.1[2] = 2.55
+  let AAAA.1 = round(AAAA.1, 2)
+  text AAAA.1 AAAA.1;
+  missing "*".
+  delete 2 AAAA.1
+
+    DO i = 1:d
+    
+        IF i < d
+          kkset aak ", "
+          let aal = XXX.1[i]
+          kkcat aal aak aam
+          copy aam RRRR.i
+
+        ELSE
+          kkset aan "   "
+          let aal = XXX.1[i]
+          kkcat aal aan aal
+          copy aal RRRR.i     
+
+        ENDIF
+
+    ENDDO
+
+  let TTTT.1[1] = 1
+  let UUUU.1[1] = 1
+  code (1) "Cases:  " TTTT.1 TTTT.1
+  code (1) "Cook's Distance:  " UUUU.1 UUUU.1
+
+  conc TTTT.1 RRRR.1-RRRR.d UUUU.1 AAAA.1 SSSS.1
+  brief 2
+  Write SSSS.1;
+  format (5X,A80).
+  brief 0
+
+  erase TTTT.1 UUUU.1 RRRR.1-RRRR.d SSSS.1 aak aal aam aan
+
+ENDIF
+
+IF sub3
+  text CCCC.1 CCCC.1
+  let FFFF.1[2] = 2.55
+  let FFFF.1 = round(FFFF.1, 2)
+  text FFFF.1 FFFF.1;
+  missing "*".
+  delete 2 FFFF.1
+
+    DO i = 1:f
+    
+        IF i < f
+          kkset aak ", "
+          let aal = CCCC.1[i]
+          kkcat aal aak aam
+          copy aam RRRR.i
+
+        ELSE
+          kkset aan "   "
+          let aal = CCCC.1[i]
+          kkcat aal aan aal
+          copy aal RRRR.i     
+
+        ENDIF
+
+    ENDDO
+
+  let TTTT.1[1] = 1
+  let UUUU.1[1] = 1
+  code (1) "Cases:  " TTTT.1 TTTT.1
+  code (1) "Cook's Distance:  " UUUU.1 UUUU.1
+
+  conc TTTT.1 RRRR.1-RRRR.f UUUU.1 FFFF.1 SSSS.1
+  brief 2
+  Write SSSS.1;
+  format (5X,A80).
+  brief 0
+
+  erase TTTT.1 UUUU.1 RRRR.1-RRRR.f SSSS.1 aak aal aam aan
+
+ENDIF
+
+IF sub4
+  text HHHH.1 HHHH.1
+  let LLLL.1[2] = 2.55
+  let LLLL.1 = round(LLLL.1, 2)
+  text LLLL.1 LLLL.1;
+  missing "*".
+  delete 2 LLLL.1
+
+    DO i = 1:h
+    
+        IF i < h
+          kkset aak ", "
+          let aal = HHHH.1[i]
+          kkcat aal aak aam
+          copy aam RRRR.i
+
+        ELSE
+          kkset aan "   "
+          let aal = HHHH.1[i]
+          kkcat aal aan aal
+          copy aal RRRR.i     
+
+        ENDIF
+
+    ENDDO
+
+  let TTTT.1[1] = 1
+  let UUUU.1[1] = 1
+  code (1) "Cases:  " TTTT.1 TTTT.1
+  code (1) "Cook's Distance:  " UUUU.1 UUUU.1
+
+  conc TTTT.1 RRRR.1-RRRR.h UUUU.1 LLLL.1 SSSS.1
+  brief 2
+  Write SSSS.1;
+  format (5X,A80).
+  brief 0
+
+  erase TTTT.1 UUUU.1 RRRR.1-RRRR.h SSSS.1 aak aal aam aan
+
+ENDIF
+
+IF sub5
+  text NNNN.1 NNNN.1
+  let QQQQ.1[2] = 2.55
+  let QQQQ.1 = round(QQQQ.1, 2)
+  text QQQQ.1 QQQQ.1;
+  missing "*".
+  delete 2 QQQQ.1
+
+    DO i = 1:k
+    
+        IF i < k
+          kkset aak ", "
+          let aal = NNNN.1[i]
+          kkcat aal aak aam
+          copy aam RRRR.i
+
+        ELSE
+          kkset aan "   "
+          let aal = NNNN.1[i]
+          kkcat aal aan aal
+          copy aal RRRR.i     
+
+        ENDIF
+
+    ENDDO
+
+  let TTTT.1[1] = 1
+  let UUUU.1[1] = 1
+  code (1) "Cases:  " TTTT.1 TTTT.1
+  code (1) "Cook's Distance:  " UUUU.1 UUUU.1
+
+  conc TTTT.1 RRRR.1-RRRR.k UUUU.1 QQQQ.1 SSSS.1
+  brief 2
+  Write SSSS.1; 
+  format (5X,A80).
+  brief 0
+
+  erase TTTT.1 UUUU.1 RRRR.1-RRRR.k SSSS.1 aak aal aam aan
+
+ENDIF
+
+#********************************************************
+#   Alert for Missing values
+
+IF not nopair 
+
+    IF non1~=count 
+
+        IF alert1 > 0
+          brief 2
+          Print " Rows with missing values have been deleted during the analysis."
+          Print " The values displayed in the session window and in the plots reflect"
+          print " this change."
+          print " "
+          brief 0
+        ENDIF
+
+    ENDIF
+
+ELSE IF triple
+
+    IF non~=count2
+
+        IF alert1 > 0
+          brief 2
+          print " Rows with missing values have been deleted during the analysis."
+          print " The values displayed in the session window and in the plots reflect"
+          print " this change."
+          print " "
+        ENDIF
+
+    ENDIF
+
+ENDIF
+
+#********************************************************
+#   Preparation for Fixed Effects Plots
+
+IF triple
+  erase GGG.1 DDD.1 EEE.1 FFF.1 non VV.1 a13 a14 a15 a16 a17 a18 a100 CCC.1 defi1 non
+ENDIF
+
+set VV.1
+3(1)
+end
+
+IF not nopair
+
+    IF non1~=count
+
+      Rank UU.1 R1                  #Rank Cook's Distance
+      Sort UU.1 TT.1 SS.1 New1 New2 New3;
+      By R1;
+      Descending R1.
+
+      let New1 = round(New1,2)
+      N New1 oops
+
+      text New1 New1
+      text New2 New2 
+      text New3 New3
+
+      let ref = New1[1]             #Maximum Dij value
+      let x1 = New2[1]
+      let y1 = New3[1]
+                            #Minimum Dij value
+      let ref1 = New1[oops]
+      let x2 = New2[oops]
+      let y2 = New3[oops]
+      
+      kkset xxx1 "Hold Pair(i,j): "         #Prepare layout
+      kkset com " , "
+      kkcat xxx1 y1 xxx1
+      kkcat xxx1 com xxx1
+      kkcat xxx1 x1 xxx1
+      kkset ba "Maximum Cook's Distance D(i,j): "
+      kkcat ba ref ba
+
+      kkset aaa1 "Hold Pair(i,j): "
+      kkcat aaa1 y2 aaa1
+      kkcat aaa1 com aaa1
+      kkcat aaa1 x2 aaa1
+      kkset bbb1 "Minimum Cook's Distance D(i,j): "
+      kkcat bbb1 ref1 bbb1
+
+      numeric New2 New2
+      numeric New3 New3
+      numeric New1 New1
+
+      let x1 = New2[1]
+      let y1 = New3[1]
+      let x2 = New2[oops]
+      let y2 = New3[oops]
+      let ref = New1[1]
+      let ref1 = New1[oops]
+      
+      let non = 0                   #Count for eigenvalues
+
+      diagonal VV.1 a13
+
+        DO i = 1:q                  #Extract appropriate subset residual
+
+            IF i = x1 or i = y1
+                  let ap = '*'
+                  goto 65
+                ENDIF
+ 
+          let WW.1[1] = LL.1[x1]
+          let WW.1[2] = LL.1[y1]
+          let WW.1[3] = LL.1[i]
+          let ZZ.1[1] = KK.x1[x1]
+          let ZZ.1[2] = KK.x1[y1]
+          let ZZ.1[3] = KK.x1[i]
+          let AAA.1[1] = KK.y1[x1]
+          let AAA.1[2] = KK.y1[y1]
+          let AAA.1[3] = KK.y1[i]
+          let BBB.1[1] = KK.i[x1]
+          let BBB.1[2] = KK.i[y1]
+          let BBB.1[3] = KK.i[i]
+
+          copy WW.1 a14             #Matrix algebra for Cook's Distance
+          transpose a14 a15
+          copy ZZ.1 AAA.1 BBB.1 a16
+          subtract a16 a13 a17  
+          eigen a17 defi1 a100
+
+            DO che = 1:3            #Check eigenvalues to see if invertible
+        
+                IF defi1[che] < .00001
+                      let non = non+1
+                      let ap = '*'
+                      goto 65
+                ENDIF
+
+            ENDDO
+          
+          invert a17 a17
+          multiply a15 a17 a18  
+          multiply a18 a16 a18
+          multiply a18 a17 a18
+          multiply a18 a14 a18
+          copy a18 CCC.1
+          let ap = CCC.1[1]
+          let ap = ap/(r*abb)  
+
+          mlabel 65
+          let GGG.1[i] = ap             #Cook's Distance
+          let DDD.1[i] = i
+          
+        ENDDO
+
+      erase WW.1 ZZ.1 AAA.1 BBB.1
+
+      let none = 0                  #Count for eigenvalues
+
+        DO i = 1:q                  #Extract appropriate subset residual
+
+                IF i = x2 or i = y2
+                  let ap = '*'
+                  goto 70
+                ENDIF
+
+          let WW.1[1] = LL.1[x2]
+          let WW.1[2] = LL.1[y2]
+          let WW.1[3] = LL.1[i]
+          let ZZ.1[1] = KK.x2[x2]
+          let ZZ.1[2] = KK.x2[y2]
+          let ZZ.1[3] = KK.x2[i]
+          let AAA.1[1] = KK.y2[x2]
+          let AAA.1[2] = KK.y2[y2]
+          let AAA.1[3] = KK.y2[i]
+          let BBB.1[1] = KK.i[x2]
+          let BBB.1[2] = KK.i[y2]
+          let BBB.1[3] = KK.i[i]
+
+          copy WW.1 a14             #Matrix algebra for Cook's Distance
+          transpose a14 a15
+          copy ZZ.1 AAA.1 BBB.1 a16
+          subtract a16 a13 a17  
+          eigen a17 defi1 a100
+
+            DO che = 1:3            #Check eigenvalues to see if invertible
+        
+                IF defi1[che] < .00001
+                      let none = none+1
+                      let ap = '*'
+                      goto 70
+                ENDIF
+
+            ENDDO
+          
+          invert a17 a17
+          multiply a15 a17 a18  
+          multiply a18 a16 a18
+          multiply a18 a17 a18
+          multiply a18 a14 a18
+          copy a18 CCC.1
+          let ap = CCC.1[1]
+          let ap = ap/(r*abb)  
+
+          mlabel 70
+          let Last.1[i] = ap            #Cook's Distance
+      
+        ENDDO
+
+      let Mak = GGG.1 - ref
+      let Mak1 = Last.1 - ref1
+          
+    ENDIF
+
+ENDIF
+
+#********************************************************
+#   Hold Command
+
+IF Hold
+
+  set RRR.1                         #identity matrix
+  2(1)
+  end
+
+  diagonal RRR.1 a19                        #Extract appropriate subset residual
+
+    DO i = 1:2                      #Extract appropriate subset residual
+      let aac = otwo[i]                 #vector and b*b minor of HAT matrix
+
+      let TTT.1[i] = LL.1[aac]
+
+        DO aad = 1:2
+              let aae = otwo[aad]
+          let KK.aac = round(KK.aac,10)
+              let Kellie.i[aad] = KK.aac[aae]
+            ENDDO
+
+    ENDDO
+
+  copy TTT.1 a20                        #Matrix algebra for Cook's Distance
+  transpose a20 a21
+  copy Kellie.1-Kellie.2 a22
+  subtract a22 a19 a23
+  eigen a23 defi5 a100
+
+    DO i = 1:2
+        
+        IF defi5[i] < .00001
+          let aaf = '*'
+          goto 75
+        ENDIF
+
+    ENDDO
+
+  invert a23 a23
+  multiply a21 a23 a24
+  multiply a24 a22 a24
+  multiply a24 a23 a24
+  multiply a24 a20 a24
+  copy a24 Neil
+  let aaf = Neil[1]
+  let aaf = aaf/(r*abb)
+
+  mlabel 75
+  copy aaf Neil
+  erase aac aad aae
+
+    IF aaf = '*'
+      brief 2
+      Print " The specified HOLD pair produces rank deficiency. "
+      Print " "
+      brief 0
+    ENDIF
+
+ENDIF
+
+#********************************************************
+#   Hold Command
+
+IF HOLD 
+
+IF aaf <> '*'
+
+  set VV.1
+  3(1)
+  end
+  
+  diagonal VV.1 a13
+
+  let none10 = 0                            #Count for eigenvalues
+
+    DO i = 1:q                      #Extract appropriate subset residual
+                                #vector and 3*3 minor of HAT matrix
+        IF i = one or i = two
+              let ap = '*'
+              goto 80
+            ENDIF
+
+      let WW.1[1] = LL.1[one]
+      let WW.1[2] = LL.1[two]
+      let WW.1[3] = LL.1[i]
+      let KK.one = Round(KK.one,10)
+          let KK.two = Round(KK.two,10)
+      let KK.i = Round(KK.i,10)
+      let ZZ.1[1] = KK.one[one]
+      let ZZ.1[2] = KK.one[two]
+      let ZZ.1[3] = KK.one[i]
+      let AAA.1[1] = KK.two[one]
+      let AAA.1[2] = KK.two[two]
+      let AAA.1[3] = KK.two[i]
+      let BBB.1[1] = KK.i[one]
+      let BBB.1[2] = KK.i[two]
+      let BBB.1[3] = KK.i[i]
+
+      copy WW.1 a14             #Matrix algebra for Cook's Distance
+      transpose a14 a15
+      copy ZZ.1 AAA.1 BBB.1 a16
+      subtract a16 a13 a17  
+      eigen a17 defi1 a100
+
+        DO che = 1:3            #Check eigenvalues to see if invertible
+        
+            IF defi1[che] < .00001
+                  let none10 = none10+1
+                  let ap = '*'
+                  goto 80
+            ENDIF
+
+        ENDDO
+          
+      invert a17 a17
+      multiply a15 a17 a18  
+      multiply a18 a16 a18
+      multiply a18 a17 a18
+      multiply a18 a14 a18
+      copy a18 CCC.1
+      let ap = CCC.1[1]
+      let ap = ap/(r*abb)  
+
+      mlabel 80
+      let Done[i] = ap          #Cook's Distance
+      
+    ENDDO
+
+  let Mak2 = Done-aaf
+
+ENDIF
+
+ENDIF
+
+#********************************************************
+#   Hold layout
+
+IF HOLD
+
+IF aaf <> '*'
+
+  copy one Scrap
+  text Scrap Scrap
+  copy Scrap one
+
+  copy two Scrap
+  text Scrap Scrap
+  copy Scrap two
+
+  kkset apa1 "Hold Pair(i,j): "     #Prepare layout
+  kkset apa2 " , "
+  kkcat apa1 one apa1
+  kkcat apa1 apa2 apa1
+  kkcat apa1 two apa1
+
+  copy aaf Scrap
+  let Scrap[1] = aaf
+  let Scrap[2] = 2.55
+  let Scrap = Round(Scrap,2)
+  text Scrap Scrap
+  let aaf = Scrap[1]
+ 
+  kkset apa3 "Cook's Distance D(i,j): "
+  kkcat apa3 aaf apa3
+
+  erase Scrap
+  copy aaf Scrap
+  numeric Scrap Scrap
+  copy Scrap aaf
+
+ENDIF
+
+ENDIF
+
+#********************************************************
+#   Plots
+
+IF not nopair
+
+    IF not noplots
+
+      title
+
+      TSPlot cdis;              #Cook's Distance Versus Case Number
+      title "Cook's Distance Versus Case Number";
+      wtitle "Cook's Distance Versus Case Number";
+      reference 2 l;
+       type 2;
+       color 9;
+       label "Threshold";
+       tcolor 16;
+      axlabel 1 "Case Number";
+      axlabel 2 "Cook's Distance".
+
+      notitle
+
+        IF non1~=count
+
+          count UU.1 info
+          
+            DO i = 1:info
+
+              kkset show " < "
+                  kkset show1 " >= "
+
+                IF UU.1[i] >= l
+                  copy l cpy
+                  text cpy cpy 
+                  copy cpy l
+                      kkcat show1 l show1
+                  let Pllot[i] = show1
+                  numeric cpy cpy
+                  copy cpy l
+      
+                ELSEIF UU.1[i] < l
+                  copy l cpy
+                  text cpy cpy 
+                  copy cpy l
+                  kkcat show l show
+                  let Pllot[i] = show
+                  numeric cpy cpy
+                  copy cpy l
+
+                ELSEIF UU.1[i] = '*'
+                  let Pllot[i] = "*"
+      
+                ENDIF
+
+            ENDDO
+
+          Name SS.1 'Case i'
+          Name TT.1 'Case j'
+          Name Pllot 'Indicator'
+
+          let ghi = q-1
+
+            IF q < 25
+
+	      title
+
+              Plot SS.1*TT.1;
+               symbol Pllot;
+                type 6 6 6;
+                color 9 2 13;
+                size 1 3 1;
+	       scale 1;
+                tick 2:q;
+               scale 2;
+                tick 1:ghi;
+               grid 1;
+               grid 2;
+               title "Cook's Distance for Case Pairs";
+	       wtitle "Cook's Distance for Case Pairs".
+
+              notitle
+
+            ELSE
+
+	      title
+  
+              Plot SS.1*TT.1;
+               symbol Pllot;
+                type 6 6 6;
+                color 9 2 13;
+                size 1 3 1;
+               grid 1;
+               grid 2;
+               title "Cook's Distance for Case Pairs";
+	       wtitle "Cook's Distance for Case Pairs".
+
+              notitle
+
+              #let VVVV.1(1) = 1
+              #let VVVV.1(2) = q
+              #let VVVV.1(3) = q
+              #let WWWW.1(1) = 1
+              #let WWWW.1(2) = q
+              #let WWWW.1(3) = 1
+
+              #Name UU.1 'Cooks Distance'
+
+              #ContourPlot UU.1*SS.1*TT.1;          #Contour Plot
+              #Connect;
+              #Type 1 2 3 4 5 6 7;
+              #Color 1 2 3 4 5 6 7;
+                  #Title "Influential Regions";
+              #Polygon VVVV.1 WWWW.1;
+              #Data;
+              #EType 0.
+
+
+            ENDIF
+
+          
+                IF non = (q-2) or none = (q-2)
+                  brief 2
+                  Print " ** Every case triple produces rank deficiency. **"
+                  Print " ** Cook's distance for case triples cannot be calculated. **"
+                  Print " "
+                  brief 0
+                  goto 85
+
+                ELSE
+
+		  #title
+		  
+                  layout
+
+                  TSPlot GGG.1;             #Omitted triples plot
+                   title "Cook's Distance for Case Additions to Hold Pair(i,j)";
+		   wtitle "Cook's Distance for Case Additions to Hold Pair(i,j)";
+                   reference 2 l;
+                     type 2;
+                     color 9;
+                     label "Threshold";
+                     tcolor 16;
+                   reference 2 ref;
+                     type 3;
+                     color 8;
+                     label "D(i,j)";
+                     tcolor 16;
+                   axlabel 1 "Case Number";
+                   axlabel 2 "Cook's Distance";
+                   figure 0 1 0.5 1;
+                   footnote xxx1;
+                   footnote ba.
+
+                  Chart Mak*DDD.1;
+		   summarized;
+                   reference 2 0;
+		     side 0;
+                     tcolor 16;
+                   title "Change in Cook's Distance for Case Additions to Hold Pair(i,j)";
+		   wtitle "Change in Cook's Distance for Case Additions to Hold Pair(i,j)";
+                   figure 0 1 0 0.5;
+                   axlabel 2 "Delta Distance (triple-pair)";
+                   axlabel 1 "Case Number".
+
+                  endlayout
+
+                  notitle
+
+                 #title
+
+                  layout         
+
+                  TSPlot Last.1;
+                   title "Cook's Distance for Case Additions to Hold Pair(i,j)";
+		   wtitle "Cook's Distance for Case Additions to Hold Pair(i,j)";
+                   reference 2 l;
+                     type 2;
+                     color 9;
+                     label "Threshold";
+                     tcolor 16;
+                   reference 2 ref1;
+                     type 3;
+                     color 8;
+                     label "D(i,j)";
+                     tcolor 16;
+                   axlabel 1 "Case Number";
+                   axlabel 2 "Cook's Distance";
+                   figure 0 1 0.5 1;
+                   footnote aaa1;
+                   footnote bbb1.
+
+                  Chart Mak1*DDD.1;
+		   summarized;
+                   reference 2 0;
+		     side 0;
+                     tcolor 16;
+                   title "Change in Cook's Distance for Case Additions to Hold Pair(i,j)";
+		   wtitle "Change in Cook's Distance for Case Additions to Hold Pair(i,j)";
+                   figure 0 1 0 0.5;
+                   axlabel 2 "Delta Distance (triple-pair)";
+                   axlabel 1 "Case Number".
+
+                  endlayout
+
+		notitle
+
+                ENDIF
+
+        ENDIF
+
+    ENDIF
+
+ENDIF
+#********************************************************
+
+IF Hold
+
+  set DDD.1
+  1:q
+  end
+
+IF not noplots
+
+IF aaf <> '*'
+
+        IF none10 = q-2
+          brief 2
+          print " "
+          print " ** Every case triple produces rank deficiency. **"
+          print " ** Cook's distance for case triples cannot be calculated. **"
+          print " "
+          brief 0
+          goto 85
+        ENDIF
+
+      #title
+
+      layout
+
+      TSPlot Done;              #Omitted triples plot
+        title "Cook's Distance for Case Additions to Hold Pair(i,j)";
+        reference 2 l;
+          type 2;
+          color 9;
+          label "Threshold";
+          tcolor 16;
+        reference 2 aaf;
+          type 3;
+          color 8;
+          label "D(i,j)";
+          tcolor 16;
+        axlabel 1 "Case Number";
+        figure 0 1 0.5 1;
+        axlabel 2 "Cook's Distance";
+        footnote apa1;
+        footnote apa3.
+
+      Chart Mak2*DDD.1;
+        summ;
+        reference 2 0;
+          side 0;
+        tcolor 16;
+        title "Change in Cook's Distance for Case Additions to Hold Pair(i,j)";
+        wtitle "Change in Cook's Distance for Case Additions to Hold Pair(i,j)";
+        figure 0 1 0 0.5;
+        axlabel 2 "Delta Distance (triple-pair)";
+        axlabel 1 "Case Number".
+
+      endlayout
+
+      #notitle
+
+ENDIF
+
+ENDIF
+
+ENDIF
+
+#*********************************************************
+
+mlabel 85
+brief 2
+endmtitle
+ENDMACRO
+
+#*********************************************************
+#           Error Macro
+Macro
+Writerror a
+
+Mconstant a
+
+brief 0
+IF a = 1
+  mtitle "Multiple Case Cook's Distance Macro Error";
+    notitle.
+  brief 2
+  Print "  **Error**  You must select a distance measure to compute."
+  print "                  Macro Exiting"
+  endmtitle
+ELSE IF a = 2
+  mtitle "Multiple Case Cook's Distance Macro Error";
+    notitle.
+  brief 2
+  Print "  **Error**  Cannot store case pairs when nopair is selected."
+  print "                  Macro Exiting"
+  endmtitle
+ELSE IF a = 3
+  mtitle "Multiple Case Cook's Distance Macro Error";
+    notitle.
+  brief 2
+  Print "  **Error**  Cannot store case triples when triple is not selected."
+  print "                  Macro Exiting"
+  endmtitle
+ELSE IF a = 4
+    mtitle "Multiple Case Cook's Distance Macro Error";
+    notitle.
+  brief 2
+  print "  **Error**  Empty column."
+  print "                  Macro Exiting"
+  endmtitle
+ELSE IF a = 5       
+  mtitle "Multiple Case Cook's Distance Macro Error";
+    notitle.
+  brief 2
+  Print "  **Error**  Column lengths not equal."
+  Print "                  Macro Exiting"
+  endmtitle
+ELSE IF a = 6
+  mtitle "Multiple Case Cook's Distance Macro Error";
+    notitle.
+  brief 2
+  Print "  **Error**  Number of cases in a subset > 10."
+  Print "                  Macro Exiting"
+  endmtitle 
+ELSE IF a = 7
+  mtitle "Multiple Case Cook's Distance Macro Error";
+    notitle.
+  brief 2
+  Print "  **Error**  Threshold value <= 0."
+  print "                  Macro Exiting"
+  endmtitle
+ELSE IF a = 8
+  mtitle "Multiple Case Cook's Distance Macro Error";
+    notitle.
+  brief 2 
+  Print "  **Error**  Insufficient data to estimate MSE."
+  Print "                  Macro Exiting"
+  endmtitle
+ELSE IF a = 9
+  mtitle "Multiple Case Cook's Distance Macro Error";
+    notitle.
+  brief 2
+  print "  **Error**  You cannot specify triple if n > 30."
+  print "                  Macro Exiting"
+  endmtitle
+ELSE IF a = 10
+  mtitle "Multiple Case Cook's Distance Macro Error";
+    notitle.
+  brief 2
+  print "  **Error**  You must specify the subcommand NOPAIR if n > 60."
+  print "                  Macro Exiting"
+  endmtitle
+ELSE IF a = 11
+  mtitle "Multiple Case Cook's Distance Macro Error";
+    notitle.
+  brief 2
+  print "  **Error**  Invalid row selected in the specified subset."
+  print "                  Macro Exiting"
+  endmtitle
+ELSE IF a = 12
+  mtitle "Multiple Case Cook's Distance Macro Error";
+    notitle.
+  brief 2
+  print "  **Error**  Duplicate row selected in the specified subset."
+  print "                  Macro Exiting"
+  endmtitle
+ELSE IF a = 13
+  mtitle "Multiple Case Cook's Distance Macro Error";
+    notitle.
+  brief 2
+  print "  **Error**  Sample size > 500."
+  print "                  Macro Exiting"
+  endmtitle
+ELSE IF a = 14
+  mtitle "Multiple Case Cook's Distance Macro Error";
+    notitle.
+  brief 2
+  print "  **Error**  Invalid data type."
+  print "                  Macro Exiting"
+  endmtitle
+ELSE IF a = 16
+  mtitle "Multiple Case Cook's Distance Macro Error";
+    notitle.
+  brief 2
+  print "  **Error**  Invalid threshold value."
+  print "                  Macro Exit"
+  endmtitle
+ENDIF
+
+ENDMACRO
+

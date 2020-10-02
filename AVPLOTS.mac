@@ -1,0 +1,219 @@
+macro
+
+#     Name:  AVPLOTS.MAC
+#   Author:  Cathy Akritas,  July 2011
+#  Version:  Minitab 18
+#
+#  This macro creates added variable plots which are also known as partial
+#  regression plots. These plots show the effect of adding an additional 
+#  independent variable, X, to a model that already includes one or more 
+#  independent variables.
+#
+#  Suppose your response, Y, is in C3, and your X's are in C4 C5 C6 and C7. 
+#  To run the macro, go to Edit > Command Line Editor and type 
+#
+#  %avplots C3 C4 C5 C6 C7
+#
+#  Click on Submit Commands.  
+
+###########################################################################
+#
+#  Neither Minitab, Inc. nor the author(s) of this MACRO makes any claim 
+#  of or offers any Warranty whatsoever with regard to the accuracy of 
+#  this MACRO or its suitability for use.  Minitab, Inc. and the author(s)
+#  of this MACRO each hereby disclaims any Warranty and/or liability with 
+#  respect thereto. 
+#
+###########################################################################
+
+avplots y x.1 - x.n
+
+mcolumn y x.1 - x.n ResidsY ResidsX beta temp
+mconstant i j m n k yname xname t1 t2 t3 t4 t5 t6 t7 slope
+
+mreset 
+noecho 
+brief 0
+notitle
+endmtitle
+
+name t2 "Error"
+
+if n=1 
+  mtitle "Added Variable Plot Macro Error";
+    notitle.
+  brief 2
+  print " ** Error ** More than one predictor variable is required"
+  print "                  Macro Exiting"
+  endmtitle
+  exit
+endif
+
+#check columns to ensure that they are not text and that they have the same length
+dtype y t1
+
+if t1 = 0 or t1 = 10
+  mtitle "Added Variable Plot Macro Error";
+    notitle.
+  brief 2
+  print " ** Error ** Input columns must contain numeric data"
+  print "                  Macro Exiting"
+  endmtitle
+  exit
+endif 
+
+do i = 1:n
+  dtype x.i t1
+
+  if t1 = 0 or t1 = 10
+    mtitle "Added Variable Plot Macro Error";
+      notitle.
+    brief 2
+    print " ** Error ** Input columns must contain numeric data"
+    print "                  Macro Exiting"
+    endmtitle
+    exit
+  endif 
+enddo
+
+#check to determine if y and all predictors have the same number of rows
+count y t1
+stack temp t1 temp
+do i = 1:n
+  count x.i t1
+  stack temp t1 temp
+enddo
+let t1 = stdev(temp)
+
+if t1 ne 0
+  mtitle "Added Variable Plot Macro Error";
+    notitle.
+  brief 2
+  print " **Error ** Input columns must all have the same number of rows"
+  print "                 Macro Exiting"
+  endmtitle
+  exit
+endif 
+
+#check to determine if there are enough rowws
+let t3 = N(Y)
+If t3 < n + 1
+  mtitle "Added Variable Plot Macro Error";
+    notitle.
+  brief 2
+  print " ** Error ** You must have at least p + 1 number of rows of data, "
+  print "                  where p is the number of specified predictor columns"  
+  print "                  Macro Exiting"
+  endmtitle
+  exit
+endif
+
+kkname yname y
+kkset t1 "Partial Regression Plot of "
+kkcat t1 yname t2
+kkset t1 " vs. "
+kkcat t2 t1 t3 
+kkname xname x.1
+kkcat t3 xname t1
+kkset t4 " Residuals"
+kkcat yname t4 t5
+kkcat xname t4 t6
+
+kkset t2 "Estimated Slope of the Least Squares Line = "
+
+subtract 1 n m
+regress; 
+  response y; 
+  continuous x.2 - x.n;
+  terms x.2 - x.n;
+  residuals residsY.
+regress;
+  response x.1;
+  continous x.2 - x.n;
+  terms x.2 - x.n;
+  residuals residsX.
+regress;
+  response residsy;
+  continuous residsx;
+  terms residsx;
+  coeffs beta.
+text beta beta
+let slope = beta[2]
+kkcat t2 slope t7
+
+mtitle "Added Variable Plot";
+  notitle.
+
+plot residsY*residsX;
+  nodtitle;
+  wtitle xname;
+  title t1;
+  axlabel 1 t6;
+  axlabel 2 t5;
+  footnote t7.
+
+if n > 2
+  do i = 2:m
+    kkname xname x.i
+    kkcat t3 xname t1
+    kkcat xname t4 t6
+    subtract 1 i j
+    add 1 i k 
+    regress;
+      response y;
+      continuous x.1-X.j x.k-x.n;
+      terms x.1 - x.j x.k - x.n;
+      residuals residsy.
+    regress;
+      response x.i; 
+      continous x.1-X.j x.k-x.n; 
+      terms x.1-X.j x.k-x.n;
+      residuals residsx.
+    regress;
+      response residsy;
+      continous residsx;
+      terms  residsx;
+      coeffs beta.
+    text beta beta
+    let slope = beta[2]
+    kkcat t2 slope t7  
+    plot residsY*residsX;
+      nodtitle;
+      title t1;
+      wtitle xname;
+      axlabel 1 t6;
+      axlabel 2 t5;
+      footnote t7.
+  enddo
+endif
+
+kkname xname x.n
+kkcat t3 xname t1
+kkcat xname t4 t6
+regress;
+  response y;
+  continous x.1-x.m;
+  terms x.1 - x.m;
+  residuals residsy.
+regress;
+  response x.n;
+  continuous x.1 -x.m; 
+  terms x.1 - x.m;
+  residuals residsx.
+regress ;
+  response residsy; 
+  continuous residsx;
+  terms residsx;
+  coeffs beta.
+text beta beta
+let slope = beta[2]
+kkcat t2 slope t7
+plot residsY*residsX;
+  nodtitle;
+  title t1;
+  wtitle xname;
+  axlabel 1 t6;
+  axlabel 2 t5;
+  footnote t7.
+endmtitle
+endmacro

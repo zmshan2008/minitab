@@ -1,0 +1,155 @@
+macro
+
+#############################################################################
+#
+#  Name:        AREAUNDER.MAC
+#  Version:     Minitab 18
+#  Written by:  Eli Walters, 5/18/2009
+#
+#
+#  This macro calculates the area under a connect line, which has
+#  application in Genetics, Plant Pathology, Agronomy, Nematology,
+#  Breeding Entomology, etc.  Specifically, it may be beneficial to
+#  those interested in the area under the disease-progress curve (AUDPC).
+#
+#  The data pairs must be stored in two columns of the active worksheet. 
+#  The first column specified must contain the x-values and the second
+#  column specified must contain the y-values.  Suppose, the x- and y-
+#  values are stored in columns C1 and C2, respectively.  Go to Edit > 
+#  Command Line Editor and type
+#
+#  %areaunder C1 C2
+#
+##########################################################################
+#
+#  Neither Minitab, Inc. nor the author(s) of this MACRO makes any claim 
+#  of or offers any Warranty whatsoever with regard to the accuracy of 
+#  this MACRO or its suitability for use.  Minitab, Inc. and the author(s)
+#  of this MACRO each hereby disclaims any Warranty and/or liability with 
+#  respect thereto. 
+#
+###########################################################################
+areaunder x y
+mcolumn x y u v tdummy
+mconstant i rarea tarea Area ymin xdiff ydiff xtyp ytyp lenx leny miny xmiss ymiss k1 k2 k3 t1 t2
+
+mreset
+brief 0
+noecho
+notitle
+endmtitle
+
+name t1 "Error" t2 "-----"
+
+##########
+# error checking
+##########
+
+dtype x xtyp
+dtype y ytyp
+
+if (xtyp <> 1 and xtyp<>2) or (ytyp<>1 and ytyp<>2)
+  mtitle "Area Under the Curve Macro Error";
+    notitle.
+  let t1 = "     Input columns must be numeric"
+  brief 2
+  print t1
+  endmtitle
+  exit
+endif
+
+count x lenx
+count y leny
+
+if lenx<2 or leny<2
+  mtitle "Area Under the Connect Line Macro Error";
+    notitle.
+  let t1 = "     Input columns must contain at least two rows of data"
+  brief 2
+  print t1
+  endmtitle
+  exit
+endif
+
+if lenx <> leny
+  mtitle "Area Under the Connect Line Macro Error";
+    notitle.
+  let t1 = "     Input columns have different lengths"
+  brief 2
+  print t1
+  endmtitle
+  exit
+endif
+
+nmiss x xmiss
+nmiss y ymiss
+
+if xmiss>0 or ymiss>0
+  mtitle "Area Under the Connect Line Macro Error";
+    notitle.
+  let t1 = "     At least one column has one or more missing values"
+  brief 2
+  print t1
+  endmtitle
+  exit
+endif
+
+let miny=min(y)
+
+if miny < 0
+  mtitle "Area Under the Connect Line Macro Error";
+    notitle.
+  let t1 = "     All y-values must be positive"
+    brief 2
+  print t1
+  endmtitle
+  exit
+endif
+
+##########
+# calculations
+##########
+
+let Area=0
+
+sort x y u v;
+  by x.
+
+do i=2:lenx
+
+  let ydiff=abs(v[i]-v[i-1])
+  let xdiff=u[i]-u[i-1]
+
+  if v[i]<=v[i-1]
+    let ymin=v[i]
+
+  else
+    let ymin=v[i-1]
+
+  endif
+
+  let rarea=ymin*xdiff
+  let tarea=0.5*xdiff*ydiff
+
+  let Area=Area+rarea+tarea
+
+enddo
+
+kkset k1 "Area Under the Connect Line:  "
+copy Area tdummy
+text tdummy tdummy
+copy tdummy k2
+
+kkcat k1 k2 k3
+
+Plot y*x;
+  Symbol;
+  Connect;
+  Area;
+  wtitle "Area Under the Connect Line";
+  Title "Area Under the Connect Line";
+  Footnote k3;
+  Footnote "NOTE: The calculated area does not update along with the graph.".
+
+endmacro
+

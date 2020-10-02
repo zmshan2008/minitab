@@ -1,0 +1,110 @@
+macro
+############################################################### 
+#
+#     Name: PERCENTILE.MAC 
+#  Version: Minitab 18
+#  modified by Andy Haines on 7/29/99, modified by CBA 4/27/2011
+#
+#  This macro calculates user specified percentiles for a data column. You 
+#  can also use a "By" variable to calculate the percentiles for groups.  
+# 
+#  For example, say the data is in C1, the percents such as 33.33 and
+#  67.6667 are in C2, and you want the percentiles stored in C10.  Choose 
+#  Edit > Command Line Editor, and type the command
+#
+#    %PERCENTILE C1 C2 C10
+#
+#  Click on Submit Commands.  To use the constant 95 instead of C2, choose 
+#  Edit > Command Line Editor and type 
+#
+#     %PERCENTILE C1 95 C10.
+#   
+#  Click on Submit Commands.  
+#
+#  The macro will also work with a "By" variable, as long as you know in 
+#  advance how many levels are in the By variable. Say that the data are 
+#  in C1, the column of percents is stored in C2, and the By variable is 
+#  C3. If C3 has three levels, you need to store the percentiles in three 
+#  columns, say C10, C11, and C12. Choose Edit > Command Line Editor and 
+#  type the commands 
+#
+#     %PERCENTILE C1 C2 C10-C12;
+#        BY C3.
+#
+#  Click on Submit Commands.
+#
+#  The number of columns at the end of the first line of the command must 
+#  match the number of levels.
+#  
+###########################################################################
+#
+#  Neither Minitab, Inc. nor the author(s) of this MACRO makes any claim 
+#  of or offers any Warranty whatsoever with regard to the accuracy of 
+#  this MACRO or its suitability for use.  Minitab, Inc. and the author(s)
+#  of this MACRO each hereby disclaims any Warranty and/or liability with 
+#  respect thereto. 
+#
+###########################################################################
+percent data perc p.1-p.m;
+  by group.
+
+mcolumn data p.1-p.m group grp dtmp label freqs b perc_col
+mconstant m i z tmp tmp2 tmp3
+mfree perc
+
+mreset
+noecho
+brief 0
+notitle
+endmtitle
+
+mtitle "Percentiles";
+notitle.
+
+kkname tmp data
+copy "Variable: " tmp2
+kkcat tmp2 tmp tmp3
+copy tmp3 label
+brief 2
+#write label
+brief 0
+if perc >= 1
+  let perc_col = perc/100
+else
+  let perc_col = perc
+endif
+
+if by
+  copy "Group: " tmp
+  tally group;
+    store grp freqs.
+  count grp m
+
+  do i = 1:m
+    copy grp z;
+      use i.
+    copy z label
+    text label label
+    copy label tmp2
+    kkcat tmp tmp2 tmp3
+    copy tmp3 label
+    copy data dtmp;
+      use group = z.
+    brief 2
+    write label
+    brief 0
+    Let p.i = percentile(dtmp, perc_col)
+    mult perc_col 100 b
+    brief 2
+    print b p.i;
+      format ('     The ',f5.2,'th percentile is ',f12.5,'.').
+  enddo
+else
+  let p.1 = percentile(data, perc_col)
+  mult perc_col 100 b
+  brief 2
+  print b p.1;
+    format ('     The ',f5.2,'th percentile is ',f12.5,'.').
+endif
+endmtitle
+endmacro

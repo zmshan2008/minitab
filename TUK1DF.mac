@@ -1,0 +1,289 @@
+macro
+
+###########################################################################
+#
+#  Name:        TUK1DF.MAC
+#  Version:     Release 15 and 16
+#  Written by:  Eli Walters on 7/22/2009
+#
+#  This macro performs Tukey's 1 degree of freedom test of nonadditivity.
+#  This allows one to test for interaction in a two-factor experiment with 
+#  a single replicate.  "The test partitions the residual sum of squares 
+#  into a single-degree-of-freedom component due to nonadditivity 
+#  (interaction) and a component for error..." (Montgomery 192, full 
+#  reference below).
+#  
+#  Suppose you have the following results of such a two-factor experiment
+#  in C1-C3 of the worksheet:
+#
+#   Temp	Pressure	 Y
+#   ----	--------	----
+#   40		20		7.9
+#   40		25		11.3
+#   40		30		13.5
+#   50		20		12.7
+#   50		25		10.9
+#   50		30		10.2
+#   60		20		11.3
+#   60		25		10.8
+#   60		30		11.0
+#
+#  By default, the significance level of the test is 0.05.  If this is
+#  the desired alpha, go to Edit > Command Line Editor and type the
+#  following (specifying the column containing the response variable first):
+#
+#  %tuk1df C3 C1 C2
+#
+#  Use the optional subcommand ALPHA to change the significance level.  If
+#  you want to test at the 0.10 level, type:
+#
+#  %tuk1df C3 C1 C2;
+#  alpha 0.1.
+#
+#  The sum of squares for both nonadditivity and error, the significance
+#  level, the test statistic, the critical value, and the conclusion will
+#  be provided in the session window.
+#
+#  NOTE:
+#
+#  Reference:  Douglas C. Montgomery, Design and Analysis of Experiments,
+#              5th Ed, 2001, pp 191-194.
+#                               
+###########################################################################
+#
+#  Neither Minitab, Inc. nor the author(s) of this MACRO makes any claim 
+#  of or offers any Warranty whatsoever with regard to the accuracy of 
+#  this MACRO or its suitability for use.  Minitab, Inc. and the author(s)
+#  of this MACRO each hereby disclaims any Warranty and/or liability with 
+#  respect thereto. 
+#
+###########################################################################
+
+tuk1df y x1 x2;
+alpha alf.
+
+mcolumn y x1 x2 lvl1 lvl2 yi yj yi2 yj2 cnt1 cnt2 prd txt1 txt2 out ones
+mcolumn sones
+mconstant lenx1 lenx2 leny sd1 sd2 ydot a b ssa ssb ssres ssn sse talf
+mconstant ddf mse fstat alf alf2 cval sst missx1 missx2 missy tcval tsse
+mconstant tssn tmse tfstat typy sd3 lchk sumchk nlvl1 nlvl2
+
+default alf=0.05
+mreset
+brief 0
+noecho
+notitle
+
+## error checking ##
+
+dtype y typy
+
+if typy<>1 and typy<>2
+  call writerror 5
+endif
+
+if alf<=0 or alf>=1
+  call writerror 2
+endif
+
+count x1 lenx1
+count x2 lenx2
+count y leny
+
+if lenx1<>lenx2 or lenx1<>leny
+  call writerror 3
+endif
+
+nmiss x1 missx1
+nmiss x2 missx2
+nmiss y missy
+
+if missx1>0 or missx2>0 or missy>0
+  call writerror 4
+endif
+
+tally x1;
+counts;
+store lvl1 cnt1.
+
+tally x2;
+counts;
+store lvl2 cnt2.
+
+n lvl1 nlvl1
+n lvl2 nlvl2
+
+if nlvl1=1 or nlvl2=1
+  call writerror 7
+endif
+
+erase lvl1
+erase lvl2
+
+stdev cnt1 sd1
+stdev cnt2 sd2
+
+if sd1<>0 or sd2<>0
+  call writerror 1
+endif
+
+set ones
+1(1)leny
+end
+
+stat ones;
+by x1 x2;
+sums sones.
+
+count sones lchk
+stdev sones sd3
+
+if lchk<>leny or sd3<>0
+  if sones[1]>1
+    call writerror 6
+  else
+    call writerror 1
+  endif
+endif
+
+## calculations ##
+
+sum y ydot
+
+stat y;
+by x1;
+gvalues lvl1;
+sums yi.
+
+stat y;
+by x2;
+gvalues lvl2;
+sums yj.
+
+n lvl1 a
+n lvl2 b
+
+let ssa=((1/b)*sum(yi**2))-((ydot**2)/(a*b))
+let ssb=((1/a)*sum(yj**2))-((ydot**2)/(a*b))
+
+let sst=sum(y**2)-((ydot**2)/(a*b))
+
+let ssres=sst-ssa-ssb
+
+convert lvl1 yi x1 yi2
+convert lvl2 yj x2 yj2
+
+let prd=y*yi2*yj2
+
+let ssn=((sum(prd)-(ydot*(ssa+ssb+((ydot**2)/(a*b)))))**2)/(a*b*ssa*ssb)
+
+let ddf=((a-1)*(b-1))-1
+name ddf "Error DF:"
+let sse=ssres-ssn
+let mse=sse/ddf
+
+let fstat=ssn/mse
+
+copy alf txt1
+fnumeric txt1;
+fixed 3.
+text txt1 txt1
+copy txt1 talf
+name talf "Significance Level:"
+
+let alf2=1-alf
+
+invcdf alf2 cval;
+f 1 ddf.
+
+let out[1]=ssn
+let out[2]=sse
+let out[3]=mse
+let out[4]=fstat
+let out[5]=cval
+
+fnumeric out;
+fixed 3.
+text out out
+let out=trim(out)
+
+let tssn=out[1]
+let tsse=out[2]
+let tmse=out[3]
+let tfstat=out[4]
+let tcval=out[5]
+
+name tssn "SS(Nonadditivity):"
+name tsse "SS(Error):"
+name tmse "MS(Error):"
+name tcval "Critical Value:"
+name tfstat "Test Statistic:"
+
+brief 2
+mtitle "Tukey's 1 DF Test of Nonadditivity"
+
+print tssn tsse tmse
+print talf tfstat tcval
+
+if fstat>cval
+  write "The test statistic is greater than the critical value, so there is significant evidence of interaction."
+else
+  write "The test statistic is not greater than the critical value, so there is no significant evidence of interaction."
+endif
+
+endmacro
+
+###########################
+###########################
+
+macro
+
+writerror x
+
+mconstant x
+
+if x = 1
+  brief 2
+  NOTE
+  NOTE ** Error ** Design must be balanced
+  NOTE
+  exit
+elseif x = 2
+  brief 2
+  NOTE
+  NOTE ** Error ** Alpha (significance level) must be between 0 and 1
+  NOTE
+  exit
+elseif x = 3
+  brief 2
+  NOTE
+  NOTE ** Error ** Input columns must have the same length
+  NOTE
+  exit
+elseif x = 4
+  brief 2
+  NOTE
+  NOTE ** Error ** Input columns cannot contain missing values
+  NOTE
+  exit
+elseif x = 5
+  brief 2
+  NOTE
+  NOTE ** Error ** Response variable (column) must be numeric
+  NOTE
+  exit
+elseif x = 6
+  brief 2
+  NOTE
+  NOTE ** Error ** Analysis is intended for only a single replicate
+  NOTE
+  exit
+elseif x = 7
+  brief 2
+  NOTE
+  NOTE ** Error ** All the values in at least one factor column are identical
+  NOTE
+  exit
+endif
+
+endmacro

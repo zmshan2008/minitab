@@ -1,0 +1,792 @@
+macro
+
+###########################################################################
+#
+#    Macro:  SIMPLEX.MAC
+#  Version:  Minitab 18
+#
+#  Created by: Eduardo Santiago 3/18/2010
+#  Submitted on: 5/26/2010 
+#  
+#  This macro finds the optimal solution of a linear program, using the 
+#  Revised Form of the Simplex. Linear programming (LP) deals with an objective
+#  function with only linear terms, and assumes only linear constraints exist. 
+#  In general, if the number of constraints is much smaller than the number
+#  of decision variables, the original form of the Simplex is rather
+#  inefficient. For more technical details about the algorithm check the
+#  reference below:
+#
+#  Bazaraa, M.S., Jarvis, J.J. and Sherali, H.D. "Linear Programming and 
+#  Network Flows", Fourth edition. John Wiley & Sons, New Jersey, 2010.  
+#  
+#  The objective function can either be to maximize or minimize a 
+#  mathematical function, e.g. representing a profit or cost. The optimization
+#  is typically constrained, meaning the optimal solution must be found
+#  within certain bounds typically defined by the amount of available 
+#  resources or budget for a project. The example below is taken from 
+#  Hillier and Lieberman and represents the manufacturing of two products
+#  (x1, x2) for the Wyndor Glass Co. The three constraints represent
+#  the ability of each one of their three plants to use resources for the 
+#  production of Product 1 (x1) and Product 2 (x2).
+#  
+#   MAXIMIZE Profit = 3x1 + 5x2 (Objective function)
+#
+#     SUBJECT TO:
+#
+#		x1        = 4	(Plant One)
+#		      2x2 = 12	(Plant Two)
+#		3x1 + 2x2 = 18	(Plant Three)
+#
+#		x1 = 0, x2 = 0	(Non-negativity constraints)
+#
+#  Now, suppose the coefficients have been entered in a Minitab worksheet,
+#  corresponding to the linear program described above.
+#  
+#  	C1	C2	C3	C4	C5
+#	1	0	<=	4	3
+#	0	2	<=	12	5
+#	3	2	<=	18	
+#
+#  To solve the Linear Program using the macro, choose Edit > Command Line
+#  Editor and enter the following commands.
+#
+#  %SIMPLEX C1-C2 C4 C5;
+#  INEQ C3.
+#  
+#  Click on the Submit Commands button.  The output will appear in the Session
+#  Window as shown below:
+#
+#   Problem Summary 
+#
+#     Maximize  3x1 + 5x2
+#
+#     Subject to:
+#
+#               1x1 + 0x2 <= 4
+#               0x1 + 2x2 <= 12
+#               3x1 + 2x2 <= 18
+# 
+#  Solution to the Problem 
+#
+#     Objective Function Value:  z* = 36
+#
+#
+#     Variables       Opt. Settings
+#     x1              2
+#     x2              6
+#
+#  In general, n + 2 columns are specified to formulate the problem. The 
+#  last argument entered in the main command corresponds to the column 
+#  containing the coefficients of the objective function. The penultimate 
+#  argument requires a column specifying the right hand side of all 
+#  inequalities in the problem (with the exception of non-negativity, since
+#  this is assumed by default). The first n columns specify the 
+#  coefficients (a11, a12,...,a1n) for all linear constraints of type 
+#  a11*x1 + a12*x2 + ... + a1n*xn.
+#
+#  By default, the macro will solve a Maximization problem, if you wish to 
+#  minimize the objective function, place a semicolon after the main
+#  command and in the second line use the word "min" and a period ("."),
+#  indicating the end of the command.
+#
+#  Last, if all inequalities are of a "<=" type, then you don't have to do
+#  anything; otherwise specify the symbols for all constraints in a single 
+#  column. You may enter any of the following symbols: >=, >, <=, <, =.
+#
+##########################################################################
+#
+#  Neither Minitab, Inc. nor the author(s) of this MACRO makes any claim 
+#  of or offers any Warranty whatsoever with regard to the accuracy of 
+#  this MACRO or its suitability for use.  Minitab, Inc. and the author(s)
+#  of this MACRO each hereby disclaims any Warranty and/or liability with 
+#  respect thereto. 
+#
+########################################################################## 
+simplex A.1-A.n b c;
+ineq constr;
+min.
+mcolumn A.1-A.n b c lb ub slack.1-slack.100 basic nonbasic redcost minratio
+mcolumn basis.1-basis.100 nonbasis.1-nonbasis.100 cbasic temp cost constr
+mcolumn xenter yk ones w.1-w.100 btemp gradient gradbase cupdate rhs ctemp
+mcolumn restrict restemp variable value costemp
+mconstant k1 k2 k3 k4 k5 k6 k7 k8 k9 k10 k11 m n flag z optimal pivot minim 
+mconstant i j k index cond altopt feasible nbvars bvars pr.1-pr.50 zstar
+mmatrix Bmatrix Binv cvec bvec cBinv ytemp ident imodif ctransp  
+
+mreset
+noecho
+notitle 
+brief 0
+endmtitle
+
+let flag = 0
+let optimal = 0
+let z = -1E16
+let altopt = 0
+let feasible = 1
+
+##########################################################################
+# Check for equal column lengths and no missing values, b > 0
+##########################################################################
+
+if ineq = 1
+  let constr = trim(constr)
+  let k1 = count(constr)
+  Nmiss constr k3
+  if k3 > 0 
+    call writerror 6
+  endif
+else
+  let k1 = count(A.1)
+  do k2 =1:k1
+    let constr[k2] = "<="
+  enddo
+endif
+
+do i = 1:n
+  let k2 = count(A.i)
+  if k2 NE k1
+    call writerror 5
+  endif
+  Nmiss A.i k3
+  if k3 > 0 
+    call writerror 6
+  endif
+enddo
+
+Nmiss b k3
+if k3 > 0 
+  call writerror 6
+endif
+let rhs = b < 0
+let k1 = sum(rhs)
+if k1 > 0 
+  call writerror 8
+endif
+
+let k11 = count(c)
+if k11 = 0
+  call writerror 9
+endif
+Nmiss c k3
+if k3 > 0 
+  call writerror 6
+endif
+
+##########################################################################
+#  Define number of constraints and artificial variables, the basis
+##########################################################################
+
+
+print constr
+let k1 = count(constr)
+copy c gradient
+if min = 1
+  let gradient = -1*c
+endif
+let k3 = count(gradient)
+let temp = constr="<="
+let k11 = sum(temp)
+let k10 = 2*k1 - k11  
+do k2 = 1:k10
+  let k3 = k3 + 1
+  let gradient[k3] = 0
+enddo
+
+Set ones
+  1(1:1/1)k1
+  End.
+Diagonal ones ident.
+let k3 = k1 + 1
+let k4 = 1
+
+do k2 = 1:k1
+  Set slack.k2
+  (0:0)k1
+  End.
+  if constr[k2] = ">=" or constr[k2] = ">"
+    let slack.k2[k2] = -1
+    Set slack.k3
+    (0:0)k1
+    End.
+    let slack.k3[k2] = 1
+    let basic[k2] = k3
+    let basis.k4 = slack.k3
+    let cbasic[k2] = -1
+    let k4 = k4 + 1
+    let k3 = k3 + 1
+    let flag = 1    
+  elseif constr[k2] = "="
+    Set slack.k3
+    (0:0)k1
+    End.
+    let slack.k3[k2] = 1
+    let basic[k2] = k3
+    let basis.k4 = slack.k3
+    let cbasic[k2] = -1
+    let k4 = k4 + 1
+    let k3 = k3 + 1
+    let flag = 1
+  elseif constr[k2] = "<=" or constr[k2] = "<"
+    let slack.k2[k2] = 1
+    let basic[k2] = k2
+    let basis.k4 = slack.k2
+    let cbasic[k2] = 0
+    let k4 = k4 + 1
+  else
+    call writerror 4
+  endif
+enddo
+
+let k4 = k4 - 1
+let k3 = k3 - 1
+copy basis.1-basis.k4 Binv.
+copy cbasic cvec.
+transpose cvec cvec.
+copy b bvec.
+let k10 = count(c)
+let gradbase = basic + k10
+
+##########################################################################
+#  Determine the nonbasic variables
+##########################################################################
+
+copy A.1-A.n nonbasis.1-nonbasis.n
+let k5 = n + 1
+do k2 = 1:n
+  let nonbasic[k2] = k2
+enddo
+do k2 = 1:k3
+  let temp = basic=k2
+  let k6 = sum(temp)
+  if k6 = 0
+    copy slack.k2 nonbasis.k5
+    let k10 = k2 + n
+    let nonbasic[k5] = k10
+    let k5 = k5 + 1
+  endif
+enddo
+
+print basic cbasic gradbase nonbasic
+
+##########################################################################
+#  Define if the origin is infeasible, then start Phase I if so.
+##########################################################################
+
+if flag = 1
+  ########################################################################
+  #  Start Phase I
+  ########################################################################
+  let k7 = k5 - 1
+  Set cost
+  (0:0)k7
+  End.
+  copy b btemp
+  Multiply cvec Binv cBinv
+  Multiply cBinv bvec z
+  While z NE 0
+    let feasible = 0
+    print nonbasis.1-nonbasis.k7
+    do k2 = 1:k7                         ###########################
+      Multiply cBinv nonbasis.k2 k8      #  Find entering variable
+      let k9 = cost[k2]                  ###########################  
+      let redcost[k2] = k8 - k9
+      if redcost[k2] < optimal
+        let optimal = redcost[k2]
+        Multiply Binv nonbasis.k2 ytemp
+        let index = k2
+        let feasible = 1
+      endif
+    enddo
+    if z NE 0 and feasible = 0   ###########################
+      call writerror 1           # Check for infeasibility
+    endif                        ###########################
+
+    copy ytemp yk
+    let minim = 1E16
+    do k2 = 1:k1                         ###########################
+      if yk[k2] = 0                      #  Find exiting variable
+        let minratio[k2] = 1E16          ########################### 
+      else
+        let minratio[k2] = btemp[k2]/yk[k2]
+        if (minratio[k2] < minim) AND (minratio[k2] >= 0)
+          let minim = minratio[k2]
+          let pivot = k2
+        endif
+      endif
+    enddo
+
+    let k10 = sum(yk <= 0)     ##################
+    if minratio[pivot] = 0     # Degeneracy
+       call writerror 2        ################## 
+    elseif k10 = k1            
+       call writerror 3        ################## 
+    endif                      # Unboundedness
+                               ################## 
+
+    let k10 = nonbasic[index]
+    let nonbasic[index] = gradbase[pivot]
+    let gradbase[pivot] = k10
+    copy cvec ctransp
+    transpose ctransp ctransp
+    copy ctransp ctemp
+    let cost[index] = ctemp[pivot]
+    print gradbase nonbasic
+    let temp = basis.pivot
+    let basis.pivot = nonbasis.index
+    let nonbasis.index = temp
+    print basis.1-basis.k1
+    print redcost optimal yk minratio pivot minim
+    copy ident w.1-w.k1
+    if yk[pivot] NE 1
+      let w.pivot[pivot] = 1/yk[pivot]
+      copy w.1-w.k1 imodif
+      Multiply imodif Binv Binv
+    endif
+    do k2 = 1:k1                          ###########################        
+      if (yk[k2] NE 0) AND (k2 NE pivot)  #  Update tableau
+        copy ident w.1-w.k1               ###########################
+        let w.pivot[k2] = -yk[k2]
+        copy w.1-w.k1 imodif
+        Multiply imodif Binv Binv
+      endif
+    enddo
+    Multiply Binv bvec btemp
+    Transpose cvec cvec
+    copy cvec temp
+    let temp[pivot] = 0
+    copy temp cvec
+    Transpose cvec cvec
+    Multiply cvec Binv cBinv
+    Multiply cBinv bvec z
+    let optimal = 0
+  Endwhile
+
+  ########################################################################
+  #  Start Phase II
+  ########################################################################
+  let cond = 1
+  let k6 = 1
+  let k5 = count(c)
+  let k4 = count(constr)
+  let k5 = k4 + k5
+  erase temp redcost
+  print k7 nonbasic
+  do k2 = 1:k7
+    if nonbasic[k2] <= k5
+      let temp[k6] = nonbasic[k2]
+      let nonbasis.k6 = nonbasis.k2
+      let k6 = k6 + 1
+    endif
+  enddo
+  copy temp nonbasic
+  let k6 = k6 - 1
+  print nonbasic nonbasis.1-nonbasis.k6
+  let k7 = count(nonbasic)
+  erase cost temp
+  do k2 = 1:k7
+    let k10 = nonbasic[k2]
+    let cost[k2] = gradient[k10]
+  enddo
+  do k2 = 1:k1
+    let k10 = gradbase[k2]
+    let temp[k2] = gradient[k10]
+  enddo
+  copy temp cvec
+  Transpose cvec cvec
+  Multiply cvec Binv cBinv
+  Multiply cBinv bvec z
+  print cvec Binv cBinv bvec
+  While cond NE 0
+    print z nonbasis.1-nonbasis.4 cost
+    let cond = 0
+    do k2 = 1:k7                         ###########################
+      Multiply cBinv nonbasis.k2 k8      #  Find entering variable
+      let k9 = cost[k2]                  ###########################  
+      let redcost[k2] = k8 - k9
+      print redcost
+      if redcost[k2] < optimal
+        let optimal = redcost[k2]
+        Multiply Binv nonbasis.k2 ytemp
+        let index = k2
+        let cond = 1
+      endif
+    enddo
+    print ytemp
+    if cond = 1
+      copy ytemp yk
+      let minim = 1E16
+      do k2 = 1:k1                         ###########################
+        if yk[k2] = 0                      #  Find exiting variable
+          let minratio[k2] = 1E16          ########################### 
+        else
+          let minratio[k2] = btemp[k2]/yk[k2]
+          if (minratio[k2] < minim) AND (minratio[k2] >= 0)
+            let minim = minratio[k2]
+            let pivot = k2
+          endif
+        endif
+      enddo
+
+      let k10 = sum(yk <= 0)     ##################
+      if minratio[pivot] = 0     # Degeneracy
+         call writerror 2        ################## 
+      elseif k10 = k1            
+         call writerror 3        ################## 
+      endif                      # Unboundedness
+                                 ################## 
+
+      print minratio
+      let k10 = nonbasic[index]
+      let nonbasic[index] = gradbase[pivot]
+      let k2 = nonbasic[index]
+      let gradbase[pivot] = k10
+      print gradbase nonbasic k10 k2 gradient
+      let temp = basis.pivot
+      let basis.pivot = nonbasis.index
+      let nonbasis.index = temp
+      print basis.1-basis.k1
+      print redcost optimal yk minratio pivot minim 
+      copy ident w.1-w.k1
+      if yk[pivot] NE 1
+        let w.pivot[pivot] = 1/yk[pivot]
+        copy w.1-w.k1 imodif
+        Multiply imodif Binv Binv
+      endif
+      do k2 = 1:k1                          ###########################        
+        if (yk[k2] NE 0) AND (k2 NE pivot)  #  Update tableau
+          copy ident w.1-w.k1               ###########################
+          let w.pivot[k2] = -yk[k2]
+          copy w.1-w.k1 imodif
+          Multiply imodif Binv Binv
+        endif
+      enddo
+      Multiply Binv bvec btemp
+      do k2 = 1:k1
+        let k10 = gradbase[k2]
+        let cupdate[k2] = gradient[k10]
+      enddo
+      do k2 = 1:k7
+        let k10 = nonbasic[k2]
+        let cost[k2] = gradient[k10]
+      enddo
+      copy cupdate cvec
+      Transpose cvec cvec
+      print cvec temp
+      Multiply cvec Binv cBinv
+      Multiply cBinv bvec z
+      let optimal = 0
+    endif
+    print Binv btemp cvec
+  Endwhile
+
+else  # Proceed to start the Revised Simplex method
+
+  let cond = 1
+  let k6 = 1
+  let k5 = count(c)
+  let k4 = count(constr)
+  let temp = constr = "="
+  let k2 = sum(temp)
+  let k7 = k5 - k2
+  do k2 = 1:k7
+    let k10 = nonbasic[k2]
+    let cost[k2] = gradient[k10]
+  enddo
+  do k2 = 1:k1
+    let k10 = gradbase[k2]
+    let temp[k2] = gradient[k10]
+  enddo
+  copy temp cvec
+  copy bvec btemp
+  Transpose cvec cvec
+  Multiply cvec Binv cBinv
+  Multiply cBinv bvec z
+  print cvec Binv cBinv bvec
+  While cond NE 0
+    print z nonbasis.1-nonbasis.k7 cost
+    let cond = 0
+    do k2 = 1:k7                         ###########################
+      Multiply cBinv nonbasis.k2 k8      #  Find entering variable
+      let k9 = cost[k2]                  ###########################  
+      let redcost[k2] = k8 - k9
+      print redcost
+      if redcost[k2] < optimal
+        let optimal = redcost[k2]
+        Multiply Binv nonbasis.k2 ytemp
+        let index = k2
+        let cond = 1
+      endif
+      if redcost[k2] = 0
+        let altopt = 1
+      endif
+    enddo
+    print ytemp
+    if cond = 1
+      copy ytemp yk
+      let minim = 1E16
+      do k2 = 1:k1                         ###########################
+        if yk[k2] = 0                      #  Find exiting variable
+          let minratio[k2] = 1E16          ########################### 
+        else
+          let minratio[k2] = btemp[k2]/yk[k2]
+          if (minratio[k2] < minim) AND (minratio[k2] > 0)
+            let minim = minratio[k2]
+            let pivot = k2
+          endif
+        endif
+      enddo
+      let k10 = sum(yk <= 0) 
+      if minratio[pivot] = 0      ###Degeneracy###
+         call writerror 2   
+      elseif k10 = k1             ###Unboundedness###
+         call writerror 3        
+      endif                      
+      print minratio
+      let k10 = nonbasic[index]
+      let nonbasic[index] = gradbase[pivot]
+      let k2 = nonbasic[index]
+      let gradbase[pivot] = k10
+      print gradbase nonbasic k10 k2 gradient
+      let temp = basis.pivot
+      let basis.pivot = nonbasis.index
+      let nonbasis.index = temp
+      print basis.1-basis.k1
+      print redcost optimal yk minratio pivot minim 
+      copy basis.1-basis.k1 Bmatrix       ###########################
+      print Bmatrix                       #  Update tableau
+      inverse Bmatrix Binv                ###########################
+      Multiply Binv bvec btemp
+      do k2 = 1:k1
+        let k10 = gradbase[k2]
+        let cupdate[k2] = gradient[k10]
+      enddo
+      do k2 = 1:k7
+        let k10 = nonbasic[k2]
+        let cost[k2] = gradient[k10]
+      enddo
+      copy cupdate cvec
+      Transpose cvec cvec
+      print cvec temp
+      Multiply cvec Binv cBinv
+      Multiply cBinv bvec z
+      let optimal = 0
+    endif
+    print Binv btemp cvec
+  Endwhile
+
+endif
+
+################################################################################
+#  Printing the optimal solution and optimal objective function value
+################################################################################
+
+mtitle "Optimal Solution Found by Simplex Macro";
+  notitle.
+brief 0
+
+let pr.1 = "Method: Revised Form of the Simplex"
+
+if min = 1
+  let pr.3 = "     Minimize  "
+else
+  let pr.3 = "     Maximize  "
+endif
+
+let k10 = count(c)
+let pr.9 = ""
+do k11 = 1:k10
+  let pr.8 = concatenate(c[k11],"x",k11)
+  if k11 = 1
+    if k10 NE 1
+      let pr.9 = pr.8
+    endif
+  else
+    let pr.9 = concatenate(pr.9," + ",pr.8)
+  endif
+enddo
+let pr.9 = concatenate(pr.3,pr.9)
+
+name pr.4 "Constraints"
+do k9 = 1:k1
+  let pr.5 = ""
+  do k11 = 1:n
+    let pr.6 = concatenate(A.k11[k9],"x",k11)    
+    if k11 = 1
+      if n NE 1
+        let pr.5 = concatenate("               ", pr.6)
+      endif
+    else
+      let pr.5 = concatenate(pr.5," + ",pr.6)
+    endif
+  enddo
+  if ineq = 0
+    let pr.5 = concatenate(pr.5," = ",b[k9])
+  else
+    if constr[k9] = "<=" or constr[k9] = "=" or constr[k9] = "<"
+      let pr.5 = concatenate(pr.5," <= ",b[k9])
+    elseif constr[k9] = ">=" or constr[k9] = "=" or constr[k9] = ">"
+      let pr.5 = concatenate(pr.5," >= ",b[k9])
+    else
+      let pr.5 = concatenate(pr.5," = ",b[k9])
+    endif
+  endif
+  let restemp = pr.5
+  stack restrict restemp restrict
+enddo
+
+#stack "" restrict restrict
+stack "     Subject to:" restrict restrict
+stack "" restrict restrict
+stack pr.9 restrict restrict
+
+brief 2
+print " Method: Revised Form of the Simplex"
+#mtitle "  Problem Summary"
+Print " Problem Summary"
+print restrict;
+  format(5x,A70).
+print " "
+#mtitle "  Solution to the Problem"
+print " Solution to the Problem"
+if min = 0
+  let zstar = z
+else
+  let zstar = -z
+endif
+let pr.10 = concatenate("     Objective Function Value:  z* = ", zstar)
+name zstar "     Objective Function Value: Z* = "
+print zstar
+
+do k2 = 1:k10
+  let flag = 0
+  do k4 = 1:k1
+    let variable[k2] = concatenate("     x",k2)
+    if gradbase[k4] = k2
+      let value[k2] = btemp[k4]
+      let flag = 1
+    endif
+  enddo
+  if flag = 0
+    let value[k2] = 0
+  endif
+enddo  
+
+stack "     Variables" variable variable
+text value value 
+let value = concatenate("     ",value)
+stack "Opt. Settings" value value 
+print variable value  ;
+  format (a35, 5x, a35).
+Print " "
+Print " "
+endmtitle
+if (altopt = 1) and (cond = 0)
+  Mtitle "Optimal Solutions do not exist"
+  brief 2
+  Print " "
+  Print "  !!!Warning!!! Alternative optimal solutions exist. "
+  Print  "
+  brief 0
+  endmtitle
+endif
+
+# print Binv gradbase btemp z nonbasic nonbasis.1-nonbasis.2 redcost
+
+endmacro
+
+################################################################################
+
+macro
+
+writerror x
+
+mconstant x
+
+if x = 1
+  MTitle "  Simplex Macro Error";
+    Notitle.
+  brief 2
+  PRINT " ** Error ** The problem is infeasible! Please check the constraints,"
+  PRINT "                    or remove one if possible."
+  PRINT "                    Macro Exiting"
+  Endmtitle
+  exit
+elseif x = 2 
+  MTitle "  Simplex Macro Error";
+    Notitle.
+  brief 2
+  PRINT " ** Error ** The problem is degenerate, the simplex method will not"
+  PRINT "                    converge. The current version of the simplex does not"
+  PRINT "                    include a lexicographic rule, problem can't be solved."
+  PRINT "                    Macro Exiting"
+  Endmtitle
+  exit
+elseif x = 3 
+  MTitle "  Simplex Macro Error";
+    Notitle.
+  brief 2
+  PRINT " ** Error ** The problem is unbounded, meaning at least one of the   "
+  PRINT "                    basic variables can grow infinitely."
+  PRINT "                    Macro Exiting"
+  Endmtitle
+  exit
+elseif x = 4
+    MTitle "  Simplex Macro Error";
+    Notitle.
+  brief 2
+  PRINT " ** Error ** Invalid constraint symbol, use only <=,<, >=, >, or =."
+  PRINT "                    Macro Exiting"
+  Endmtitle
+  exit
+elseif x = 5
+  MTitle "  Simplex Macro Error";
+    Notitle.
+  brief 2
+  PRINT " ** Error ** The columns used to define the constraints and the "
+  PRINT "                    column defining the equality and inequality symbols"  
+  PRINT "                    should have the same column length."
+  PRINT "                    Macro Exiting"
+  Endmtitle
+  exit
+elseif x = 6
+  MTitle "  Simplex Macro Error";
+    Notitle.
+  brief 2
+  PRINT " ** Error ** No Missing values can be entered in any inputs of the"
+  PRINT "                    formulated problem.             "
+  PRINT "                    Macro Exiting"
+  Endmtitle
+  exit
+elseif x = 7
+  MTitle "  Simplex Macro Error";
+    Notitle.
+  brief 2
+  PRINT " ** Error ** The number of columns used to define the constraints in "
+  PRINT "                    A, need to match the number of coefficients in the "
+  PRINT "                    objective function. Put 0's for elements not included."
+  PRINT "                    Macro Exiting"
+  Endmtitle
+  exit
+elseif x = 8
+  MTitle "  Simplex Macro Error";
+    Notitle.
+  brief 2
+  PRINT " ** Error ** The Right Hand Side coefficients of your constraints "
+  PRINT "                    should be all non-negative. "
+  PRINT "                    Macro Exiting"
+  Endmtitle
+  exit
+elseif x = 9
+  MTitle "  Simplex Macro Error";
+    Notitle.
+  brief 2
+  PRINT " ** Error ** The gradient of the objective function is empty, please"
+  PRINT "                    enter at least one coefficient for the decision "
+  PRINT "                    variables, or enter the correct column."
+  PRINT "                    Macro Exiting"
+  Endmtitle
+  exit
+endif
+
+endmacro

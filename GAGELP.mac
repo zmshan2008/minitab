@@ -1,0 +1,240 @@
+macro
+#
+#    Macro:  GAGELP.MAC
+#   Author:  Veronica Powell
+#  Version:  Minitab 18
+#
+#  This macro performs a Gage R&R analysis on multiple measurement columns,
+#  using the same part and operator columnms.  The spec limits can be 
+#  specified for each measurement column.
+#
+#  Suppose you have 5 columns of measurement data in C5 - C9 and that the 
+#  part indicators are in C3, and the operator indicators are in C4.  
+#  
+#  To run the macro without spec limits, choose Edit > Command Line Editor 
+#  and type the following
+#
+#  %gagelp c3 c4 c5-c9
+#
+#  Click on Submit Commands.
+#
+#  Suppose the lower spec limits are in C11 and the upper spec limits are 
+#  in C12.  To run the macro including both the upper and lower  
+#  spec limits, choose Edit > Command Line Editor and type the following
+#
+#  %gagelp c3 c4 c5-c9;
+#  lsl c11;
+#  usl c12.
+#
+#  Click on Submit Commands.
+#
+#  To run the macro where you have just a lower spec limit, choose Edit > 
+#  Command Line Editor and type the following
+#
+#  %gagelp c3 c4 c5-c9;
+#  lsl c11.
+#
+#  Click on Submit Commands.
+#
+#  To run the macro where you have just an upper spec limit, choose Edit > 
+#  Command Line Editor and type the following
+#
+#  %gagelp c3 c4 c5-c9;
+#  usl c12.
+#
+#  Click on Submit Commands.
+#
+#  Note:  If you input 5 measurement columns, then the column containing the
+#  spec limit column(s) should have 5 rows; one tolerance for each 
+#  measurement column.  
+#
+###########################################################################
+#
+#  Neither Minitab, Inc. nor the author(s) of this MACRO makes any claim 
+#  of or offers any Warranty whatsoever with regard to the accuracy of 
+#  this MACRO or its suitability for use.  Minitab, Inc. and the author(s)
+#  of this MACRO each hereby disclaims any Warranty and/or liability with 
+#  respect thereto. 
+#
+###########################################################################
+
+gagelp part op x.1-x.n;
+  lsl low;
+  usl high.
+
+mconstant n i tmp tmp2 k1 k2 k3 k4 k5 k6 k7 k8 
+mcolumn x.1-x.n part op tol ttol t1 t2 t3 t4 low high
+
+mreset
+brief 0
+noecho
+notitle 
+endmtitle
+
+#Determine that all the input response are numeric (not text)
+
+do i = 1:n
+  dtype x.i tmp
+  if tmp =0 or tmp = 10 or tmp = 3
+    mtitle "Gage R&R on Multiple Measurement Columns Macro Error";
+      notitle.
+    brief 2
+    Print " ** Error **  All the measurment columns must be numeric."
+    Print " "
+    Print "              **  Macro exiting  **"
+    endmtitle
+    exit
+  endif
+enddo
+
+#Determine that all input columns have the same length
+stack x.1 - x.n t1;
+  subs t2.
+
+stat t1;
+  by t2;
+  count t4.
+
+let k1 = count(part)
+let k2 = count(op)
+stack k1 k2 t4 t4
+let k2 = stdev(t4)  #stdev of counts should be 0 if all input columns have the same length.
+
+If k2 <> 0
+  mtitle "Gage R&R on Multiple Measurement Columns Macro Error";
+    notitle.
+  brief 2
+  Print " ** Error **  All of the measurement data columns, the part column, and the "
+  Print "                   operator column must have the same number of rows.  "
+  Print " " 
+  Print "                  ** Macro exiting **"
+  endmtitle
+  exit
+endif
+
+#Ensure that the length of the tolerance column is n = number of response columns. 
+if usl = 1 and lsl = 1
+  let k1 = count(low)
+  let k2 = count(high)
+  if k1 <> n or k2 <> n
+    mtitle "Gage R&R on Multiple Measurement Columns Macro Error";
+      notitle.
+    brief 2
+    Print " ** Error **  The spec limit columns must have the same number of rows as "
+    Print "              the number of response columns.  For example, if you input 5" 
+    Print "              response columns, then the spec limit columns should have 5 "
+    Print "              rows of spec limits."
+    Print " "
+    Print "              ** Macro exiting **"
+    endmtitle
+    exit
+  endif
+elseif usl = 1 and lsl = 0
+    let k1 = count(high)
+  if k1 <> n 
+    mtitle "Gage R&R on Multiple Measurement Columns Macro Error";
+      notitle.
+    brief 2
+    Print " ** Error **  The spec limit column must have the same number of rows as "
+    Print "              the number of response columns.  For example, if you input 5"
+    Print "              response columns, then the spec limit column should have 5 "
+    Print "              rows of spec limits."
+    Print " "
+    Print "              ** Macro exiting **"
+    endmtitle
+    exit
+  endif
+elseif usl = 0 and lsl = 1
+    let k1 = count(low)
+  if k1 <> n 
+    brief 2
+    mtitle "Gage R&R on Multiple Measurement Columns Macro Error";
+      notitle.
+    Print " ** Error **  The spec limit column must have the same number of rows as "
+    Print "              the number of response columns.  For example, if you input "
+    Print "              5 response columns, then the spec limit column should have "
+    Print "              5 rows of spec limits."
+    Print " "
+    Print "              ** Macro exiting **"
+    endmtitle
+    exit
+  endif 
+endif
+
+kkset K1 "Gage R&R Study - ANOVA Method for "
+kkset k5 "Tolerance = "
+
+if lsl = 1 and usl = 1
+  let tol = high - low
+  text tol ttol
+  do i=1:n
+    let tmp=tol[i]
+    let tmp2=ttol[i]
+    kkname k3 x.i
+    kkcat k1 k3 k4
+    kkcat k5 tmp2 k6
+    brief 2
+    ###mtitle k4
+    ###endmtitle
+    ###mtitle k6
+    GageRR;
+      Parts part;
+      Opers op;
+      Response x.i;
+      Studyvar 6;
+      Toler tmp;
+      GToler tmp2.
+  enddo
+elseif usl=0 and lsl=0
+  do i=1:n
+    kkname k3 x.i
+    kkcat k1 k3 k4
+    brief 2
+    ###mtitle k4 
+    GageRR;
+      Parts part;
+      Opers op;
+      Response x.i;
+      Studyvar 6.
+  enddo
+elseif lsl = 1 and usl = 0
+  text low ttol
+  do i=1:n
+    let tmp=low[i]
+    let tmp2=ttol[i]
+    kkname k3 x.i
+    kkcat k1 k3 k4
+    kkcat k5 tmp2 k6
+    brief 2
+    ###mtitle k4
+    ###mtitle k6
+    GageRR;
+    Parts part;
+    Opers op;
+    Response x.i;
+    Studyvar 6;
+    lsl tmp;
+    GToler tmp2.
+  enddo
+elseif lsl = 0 and usl = 1
+  text high ttol
+  do i=1:n
+    let tmp=high[i]
+    let tmp2=ttol[i]
+    kkname k3 x.i
+    kkcat k1 k3 k4
+    kkcat k5 tmp2 k6
+    brief 2
+    ###mtitle k4
+    ###mtitle k6
+    GageRR;
+    Parts part;
+    Opers op;
+    Response x.i;
+    Studyvar 6;
+    usl tmp;
+    GToler tmp2.
+  enddo
+endif
+endmtitle
+endmacro

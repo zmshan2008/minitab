@@ -1,0 +1,102 @@
+macro
+###########################################################################
+#                                                                
+#  Macro:   QRTILES.MAC                                          
+#  Version: Minitab 18
+#  Date :   September, 2004                                      
+#  Author:  Michelle Paret
+#                                                                
+#  This macro will calculate the first and third quartiles using the 
+#  counting method found in many textbooks, as opposed to the percentile 
+#  method used in MINITAB.                        
+#                                                                
+#  Suppose column C1 contains the data. To run the macro, choose Edit > 
+#  Command Line Editor, and type:
+#                                                                
+#  %QRTILES C1 
+# 
+#  Click on Submit Commands.
+#
+###########################################################################
+#
+#  Neither Minitab, Inc. nor the author(s) of this MACRO makes any claim 
+#  of or offers any Warranty whatsoever with regard to the accuracy of 
+#  this MACRO or its suitability for use.  Minitab, Inc. and the author(s)
+#  of this MACRO each hereby disclaims any Warranty and/or liability with 
+#  respect thereto. 
+#
+###########################################################################
+
+
+qrtiles y
+
+mcolumn y x input output dvide rround diff oddeven
+mcolumn ptrn ByVar1 Med1
+mconstant n q1 q3 dvd yname title
+
+mreset 
+brief 0
+noecho
+notitle
+endmtitle
+
+count y n
+sort y x;
+ by y.
+
+erase q1 q3 ByVar1 Med1 ptrn
+
+let input(1)=n
+let dvide = input/2
+let rround = ROUND(dvide)
+let diff = rround - dvide
+let oddeven = diff = 0.5
+# thus 1 is for "odd" and
+# 0 is for "even" in the oddeven column
+
+let dvd=floor(dvide,0)
+
+kkname yname y
+let title = concat("Counting Method: 1st & 3rd Quartiles for ", yname)
+mtitle title;
+  notitle.
+
+#if number of observations is odd
+if oddeven(1) = 1
+Set ptrn
+ dvd(1) 1(2) dvd(3)
+ End.
+Statistics x;
+  By ptrn;
+  GValues ByVar1;
+  Median Med1.
+let q1 = Med1(1)
+let q3 = Med1(3)
+brief 2
+
+print q1;
+   format (t5,'The first quartile = ',f12.4).
+print q3;
+   format (t5,'The third quartile = ',f12.4).
+endif
+
+#if number of observations is even
+if oddeven(1) = 0
+Set ptrn
+    1( 1 : 2 / 1 )dvd
+  End.
+Statistics x;
+  By ptrn;
+  GValues ByVar1;
+  Median Med1.
+let q1=Med1(1)
+let q3=Med1(2)
+
+brief 2
+print q1;
+   format (t5,'The first quartile = ',f12.4).
+print q3;
+   format (t5,'The third quartile = ',f12.4).
+endif
+endmtitle
+endmacro

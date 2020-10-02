@@ -1,0 +1,136 @@
+macro
+
+#    Macro:  ByReg.MAC
+#   Author:  Cathy Akritas
+#  Version:  Minitab 18
+#
+#  Runs a regression analysis for each level of the grouping variable.
+#
+#  Suppose the dependent variable (Y) is in C2, the independent variables 
+#  (X's) are in C3 - C8, and the grouping variable is C10.  To run the 
+#  macro, choose Edit > Command Line Editor and type the command
+#
+#  %byreg C2 C3 - C8 C10
+#  
+#  Click on Submit Commands.  
+#
+#  The last column listed is assumed to be the grouping variable. The 
+#  macro will skip any group that does not have at least p + 2 
+#  observations where p is the number of independent variables.  
+#  
+###########################################################################
+#
+#  Neither Minitab, Inc. nor the author(s) of this MACRO makes any claim 
+#  of or offers any Warranty whatsoever with regard to the accuracy of 
+#  this MACRO or its suitability for use.  Minitab, Inc. and the author(s)
+#  of this MACRO each hereby disclaims any Warranty and/or liability with 
+#  respect thereto. 
+#
+###########################################################################
+
+byreg y x.1 - x.n gr
+
+mcolumn y x.1 - x.n gr b0 b.1 - b.n uniqs freqs tmp1 tmp2 z tuniqs betas bs 
+mcolumn allmse labs radj radjs
+mconstant gr_n i j k yname gname t1 t2 t3 t4 nz mse k1 k2 k3
+
+mreset 
+brief 0
+noecho
+notitle
+endmtitle
+
+dtype gr k
+
+if k = 0
+  vorder gr;
+    worksheet.
+endif
+
+tally gr;
+  store uniqs freqs.
+text uniqs tuniqs
+count freqs gr_n
+kkname yname Y
+
+kkname gname Gr
+Let t3 = concat("Regression Analysis:", Yname, " by ", gname)
+Mtitle t3;
+  notitle.
+Let t3 = concat(Yname, " by ", gname)
+name t1 "Regression Analysis:"
+
+do i = 1:gr_n
+  let j = uniqs[i]
+  let k = tuniqs[i] 
+  kkcat t3 k t1
+  copy y z
+  let t4 = concat(Yname, ": ", K)
+  name z t4
+  let tmp1 = (gr = j)
+  code (1) 0 (0) '*' tmp1 tmp1
+  add tmp1 z z
+  n z nz
+  subtract 2 nz nz 
+  if nz < n
+    goto 10
+  endif
+  note
+  note
+  brief 1
+  print t1
+  regress;
+    response z;
+    continuous x.1 - x.n ;
+    terms X.1 - x.n;
+    nodefault;
+    tsimple;
+    tequation;
+    tsummary;
+    Tanova;
+    coeff bs;
+    SrSadj Radj;
+    mse mse.
+  print "---------------------------------------------------------------------------------"
+  print "                                                                                 "
+  zerr
+  brief 0
+  stack betas bs betas
+  stack (allmse radjs) (mse radj) (allmse radjs)
+  stack labs k labs
+  mlabel 10
+enddo  
+
+let i = n + 1
+let gr_n = n(labs)
+set z
+ gr_n(1:i)
+end
+unstack betas b0 b.1 - b.n;
+  subs z.
+kkset k1 "Coeff_"
+let radjs = if(radjs < 0, 0, radjs)
+fnumeric radjs;
+  percentage 2.  
+text labs b0 b.1 - b.n allmse radjs labs b0 b.1 - b.n allmse radjs
+do i = 1:n
+  kkname k2 x.i 
+  kkcat k1 k2 k3
+  stack k3 b.i b.i
+enddo
+kkname k1 gr
+stack ("Constant" "MSE" k1 "R-sq(Adj)") (b0 allmse labs radjs) (b0 allmse labs radjs)
+
+ow 130
+brief 1
+notitle
+print "Table of Coefficients"
+write labs b0 b.1 - b.n radjs
+
+If n = 1 
+  Plot Y*X.1;
+   Symbol gr;
+   Regress gr.
+endif
+endmtitle
+endmacro

@@ -1,0 +1,53 @@
+macro
+
+###########################################################################
+#
+#
+#     Name:  MNSTD.MAC 
+#  Version:  Minitab 18
+#
+#  This macro calculates the cumulative mean and cumulative standard deviation  
+#  for the input data.  These cumulative values are stored in the worksheet.
+#
+#  Suppose your data are in C1, and you want to store the cumulative means 
+#  in C2, and you want to store the cumulative standard deviations for these 
+#  values in C3. Go to Edit > Command Line Editor and type
+#
+#    %MNSTD C1 C2 C3 
+#
+#  Click on Submit Commands
+# 
+###########################################################################
+#
+#  Neither Minitab, Inc. nor the author(s) of this MACRO makes any claim 
+#  of or offers any Warranty whatsoever with regard to the accuracy of 
+#  this MACRO or its suitability for use.  Minitab, Inc. and the author(s)
+#  of this MACRO each hereby disclaims any Warranty and/or liability with 
+#  respect thereto. 
+#
+###########################################################################
+mnstd x y z
+mcolumn x y  z v a b
+mconstant N i k1 k2
+
+mreset
+brief 0
+noecho
+notitle
+endmtitle
+
+let N=count(x)
+
+Do i=2:N
+  Copy x v;
+    Use 1:i.
+  Mean v k1
+#  let y[i]=k1
+  StDev v k2
+#  let z[i]=k2
+  stack (a b) (k1 k2) (a b)
+enddo
+stack ('*' '*') (a b) (y z)
+Mtitle "The Cumulative Means & StDevs are Stored in the Worksheet"
+endmtitle  
+endmacro

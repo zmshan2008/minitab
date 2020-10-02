@@ -1,0 +1,745 @@
+macro
+#
+#         Macro: MOSAIC.MAC
+#       Version: Minitab 18
+#
+#  Submitted by: Joel Smith, Daniel Griffith, Kelly Aubuchon, January 2012
+# 
+#  This macro generates a Mosaic Plot. The size of each rectangle is proportional
+#  to the percentage of observations from that combination of variable levels. 
+#
+#  The macro requires 3 categorical variables, and the total number of
+#  combinations cannot exceed 50.
+#
+#  Suppose three categorical variables are in columns C1, C2, and C3.  To run
+#  the macro, choose Edit > Command Line Editor and type 
+#  
+#  %mosaic C1 C2 C3
+#
+#  Click on Submit Commands.  
+#
+###############################################################################
+#
+#  Neither Minitab, Inc. nor the author(s) of this MACRO makes any claim of or
+#  offers any Warranty whatsoever with regard to the accuracy of this MACRO
+#  or its suitability for use.  Minitab, Inc. and the author(s) of this MACRO
+#  each hereby disclaims any Warranty and/or liability with respect thereto. 
+#
+###############################################################################
+
+mosaic var1 var2 var3
+
+mcolumn var1 var2 var3 dummy1 byvar1 byvar2 byvar3 byvar12 byvar123 sum1 sum2 
+mcolumn sum3 pct1 pct2 pct3 tally1 tally2 tally3 tally4 cbyv12 cpct12 cpsum12  
+mcolumn psum12 cbyv123 cpct123 cpsum123 psum123 tally5 tally6 y1min y1max x1min  
+mcolumn x1max y2min y2max x3min x3max cdx1min cdx1max cdy2min cdy2max cdx3min  
+mcolumn cdx3max xmin xmax ymin ymax t1 l1 t2 l2 tmp tmp1 colr
+mconstant i n j combos levels1 levels2 levels3 nn txmin txmax tymin tymax temp  
+mconstant vname1 vname2 vname3 lname1 lname2 lname3 lname4 lname5 col1 
+mconstant col2 col3 col4 col5
+
+Mreset
+noecho
+brief 0
+notitle
+endmtitle
+
+let j = count(var1)
+set dummy1
+  1(1:1/1)j
+  end.
+
+### Find the total for each combination of levels
+
+Statistics dummy1;
+  By var1 var2 var3;
+  GValues byvar1 byvar2 byvar3;
+  N sum3.
+
+Statistics  sum3;
+  By byvar1 byvar2;
+  Expand;
+  GValues byvar1 byvar2;
+  Sums sum2.
+
+if min(sum2)=0
+  mtitle "Mosaic Plot Macro Error";
+    notitle.
+  brief 1
+  Print "  ** Error **  Not enough combinations for each level"
+  Print "                    Macro Exiting"
+  endmtitle
+  Exit
+endif
+
+Statistics  sum3;
+  By  byvar1;
+  Expand;
+  GValues byvar1;
+  Sums sum1.
+
+### Convert these into percentages
+
+Let pct1 = sum1/j
+Let pct2 = sum2/sum1
+Let pct3 = sum3/sum2
+
+### Calculate tick labels
+
+tally var1;
+cump;
+store l1 tmp.
+
+diff 1 tmp tmp1.
+let tmp1[1]=tmp[1]
+let t1=tmp-tmp1/2
+
+tally var2;
+cump;
+store l2 tmp.
+
+diff 1 tmp tmp1.
+let tmp1[1]=tmp[1]
+let t2=tmp-tmp1/2
+
+### Then we prepare for an iterative approach to drawing rectangles by defining  
+### the number of levels of each variable and calculating the minimum and maximum  
+### x'y and y's for the levels of variable 1
+
+Tally var1 var2 var3;
+  Percents;
+  Store tally1 tally2 tally3 tally4 tally5 tally6.
+
+Let levels1 = count(tally1)
+Let levels2 = count(tally3)
+Let levels3 = count(tally5)
+
+if levels3 > 5
+  mtitle "Mosaic Plot Macro Error";
+    notitle.
+  brief 1
+  Print "  ** Error **  Cannot have more than 5 levels for third variable"
+  Print "                    Macro Exiting"
+  endmtitle
+  Exit
+endif
+
+if levels1 > 10 or levels2 > 10 or levels3 > 10
+  mtitle "Mosaic Plot Macro Error";
+    notitle.
+  brief 1
+  Print "  ** Error **  Cannot have more than 10 levels per variables"
+  print "                    Macro Exiting"
+  endmtitle
+  Exit
+endif
+
+if levels1*levels2*levels3 > 50
+  mtitle "Mosaic Plot Macro Error";
+    notitle.
+  brief 1
+  Print "  ** Error **  Cannot have more than 50 Combinations"
+  print "                    Macro Exiting"
+  endmtitle
+  Exit
+
+endif
+
+Let combos = levels1*levels2*levels3
+
+set y1min
+  1(0:0/1)combos
+  end.
+set y1max
+  1(1:1/1)combos
+  end.
+
+Let cdx1min = (parsum(tally2)-tally2)/100
+Convert tally1 cdx1min byvar1 x1min
+Let cdx1max = parsum(tally2)/100
+Convert tally1 cdx1max byvar1 x1max
+
+### Each vairable deeper shares dimensions with the previous, so x1min = x2min  
+### and x1max = x2max.  So for variable 2 we just do the y's, and include the  
+### floor command to "reset" at each new level of variable 1.
+
+let byvar12=Concat(byvar1,byvar2)
+Statistics pct2;
+  By  byvar12;
+  NoEmpty;
+  GValues cbyv12;
+  Mean cpct12.
+Let cpsum12 = parsum(cpct12)
+Convert cbyv12 cpsum12 byvar12 psum12.
+
+Let y2min = psum12-floor(psum12-.00000001)-pct2
+Let y2max = psum12-floor(psum12-.00000001)
+
+### Now for variable 3, the min and max y's carry over from variable 2 so we 
+### just need the x's in the same way as variable 2
+
+let byvar123=Concat(byvar1,byvar2,byvar3)
+Statistics pct3;
+  By  byvar123;
+  NoEmpty;
+  GValues cbyv123;
+  Mean cpct123.
+Let cpsum123 = parsum(cpct123)
+Convert cbyv123 cpsum123 byvar123 psum123.
+
+Let x3min = psum123-floor(psum123-.00000001)-pct3
+Let x3max = psum123-floor(psum123-.00000001)
+
+### For simplicity, calculate the final dimensions of each rectangle
+
+Let xmin = x1min + x3min*(x1max-x1min)
+Let xmax = x1min + x3max*(x1max-x1min)
+Let ymin = y2min
+Let ymax = y2max
+
+### Specify colors for mosaic plot
+
+count ymax nn
+
+if levels3 =2
+
+let nn=nn/2
+set colr
+nn( 65 27)1
+End.
+
+elseif levels3=3
+
+let nn=nn/3
+set colr
+nn( 65 27 95)1
+End.
+
+elseif levels3=4
+
+let nn=nn/4
+set colr
+nn( 65 27 95 116 )1
+End.
+
+elseif levels3=5
+
+let nn=nn/5
+set colr
+nn( 65 27 95 116 82)1
+End.
+
+elseif levels3=6
+
+let nn=nn/6
+set colr
+nn( 65 27 95 116 82 67)1
+End.
+
+elseif levels3=7
+
+let nn=nn/7
+set colr
+nn( 65 27 95 116 82 67 8)1
+End.
+
+elseif levels3=8
+
+let nn=nn/8
+set colr
+nn( 65 27 95 116 82 67 8 13)1
+End.
+
+elseif levels3=9
+
+let nn=nn/9
+set colr
+nn( 65 27 95 116 82 67 8 13 35)1
+End.
+
+elseif levels3=10
+
+let nn=nn/10
+set colr
+nn( 65 27 95 116 82 67 8 13 35 83)1
+End.
+
+endif
+
+let t1=t1/100
+let t2=t2/100
+
+count xmin nn
+
+mtitle "Mosaic Plot";
+  notitle.
+layout;
+wtitle "Mosaic Plot". 
+
+do i=1:nn
+
+let txmin=xmin[i]
+let txmax=xmax[i]
+let tymin=ymin[i]
+let tymax=ymax[i]
+let temp= colr[i]
+
+Plot xmin * ymin;
+  Scale 1;
+    LDisplay 0 0 0 0;
+    HDisplay 0 0 0 0;
+    MODEL 1;
+      Min 0;
+      Max 1;
+    EndMODEL;
+  Scale 2;
+    LDisplay 0 0 0 0;
+    HDisplay 0 0 0 0;
+    MODEL 1;
+      Min 0;
+      Max 1;
+    EndMODEL;
+  AxLabel 1;
+    ADisplay 0;
+  AxLabel 2;
+    ADisplay 0;
+  NoJitter;
+  Data .15 .7 .14 .8733;
+    Type 0;
+    Color 0;
+etype 0;
+ecolor 0;
+  Symbol;
+    Type 0;
+    Size 1;
+  Footnote;
+    FPanel;
+  NoDTitle;
+rectange txmin tymin txmax tymax;
+type 1;
+color temp;
+unit 1;
+esize 2;
+ecolor 39.
+
+enddo
+
+if levels3=2
+
+kkname vname1 var1
+kkname vname2 var2
+kkname vname3 var3
+
+text tally5 tally5
+
+let lname1=left(tally5[1],10)
+let lname2=left(tally5[2],10)
+
+let col1=colr[1]
+let col2=colr[2]
+
+Plot xmin * ymin;
+  Scale 1;
+  LDisplay 1 0 1 0;
+    MODEL 1;
+    tick t1;
+    label l1;
+      Min 0;
+      Max 1;
+    EndMODEL;
+  Scale 2;
+LDisplay 1 0 1 0;
+   angle 90;
+    MODEL 1;
+    tick t2;
+    label l2;
+      Min 0;
+      Max 1;
+    EndMODEL;
+  AxLabel 1 vname1;
+    ADisplay 1;
+    offset 0 .0001;
+  AxLabel 2 vname2;
+    ADisplay 1;
+    offset 0 .015;
+  NoJitter;
+  Data .15 .69 .14 .8733;
+    Type 0;
+    Color 0;
+    etype 0;
+    ecolor 0;
+  Symbol;
+    Type 0;
+    Size 1;
+  Footnote;
+    FPanel;
+  title "Mosaic Plot";
+Offset -0.08 -0.0508702935526768;
+ Rectangle 1.15 0.73 1.48 1;
+    Unit 1;
+    Type 1;
+    Color 0;
+   Text 1.24 0.96 vname3;
+    Unit 1;
+     Box 1.24 1.49 0.92 0.96;
+     tcolor 1;
+    Angle 0;
+    Offset 0 0;
+    Bold;
+   Text 1.265 0.89 lname1;
+    Unit 1;
+     Box 1.265 1.49 0.84 0.88;
+     tcolor 1;
+   Text 1.265 0.89 lname2;
+    Unit 1;
+     Box 1.265 1.49 .77 .81;
+     tcolor 1;
+    Angle 0;
+    Offset 0 0;
+   Marker 1.21 0.857;
+    Unit 1;
+    Type 12;
+    Color col1;
+    Size 2;
+   Marker 1.21 0.787;
+    Unit 1;
+    Type 12;
+    Color col2;
+    Size 2;
+  NoDTitle.
+
+elseif levels3=3
+
+kkname vname1 var1
+kkname vname2 var2
+kkname vname3 var3
+
+text tally5 tally5
+
+let lname1=left(tally5[1],10)
+let lname2=left(tally5[2],10)
+let lname3=left(tally5[3],10)
+
+let col1=colr[1]
+let col2=colr[2]
+let col3=colr[3]
+
+Plot xmin * ymin;
+  Scale 1;
+LDisplay 1 0 1 0;
+    MODEL 1;
+    tick t1;
+    label l1;
+      Min 0;
+      Max 1;
+    EndMODEL;
+  Scale 2;
+LDisplay 1 0 1 0;
+   angle 90;
+    MODEL 1;
+    tick t2;
+    label l2;
+      Min 0;
+      Max 1;
+    EndMODEL;
+  AxLabel 1 vname1;
+    ADisplay 1;
+    offset 0 .0001;
+  AxLabel 2 vname2;
+    ADisplay 1;
+    offset 0 .015;
+  NoJitter;
+  Data .15 .69 .14 .8733;
+    Type 0;
+    Color 0;
+    etype 0;
+    ecolor 0;
+  Symbol;
+    Type 0;
+    Size 1;
+  Footnote;
+    FPanel;
+  title "Mosaic Plot";
+Offset -0.08 -0.0508702935526768;
+ Rectangle 1.15 0.66 1.48 1;
+    Unit 1;
+    Type 1;
+    Color 0;
+   Text 1.24 0.96 vname3;
+    Unit 1;
+     Box 1.24 1.49 0.92 0.96;
+     tcolor 1;
+    Angle 0;
+    Offset 0 0;
+    Bold;
+   Text 1.265 0.89 lname1;
+    Unit 1;
+     Box 1.265 1.49 0.84 0.88;
+     tcolor 1;
+   Text 1.265 0.89 lname2;
+    Unit 1;
+     Box 1.265 1.49 .77 .81;
+     tcolor 1;
+    Angle 0;
+    Offset 0 0;
+    Text 1.265 0.89 lname3;
+    Unit 1;
+     Box 1.265 1.49 .7 .74;
+     tcolor 1;
+    Angle 0;
+    Offset 0 0;
+   Marker 1.21 0.857;
+    Unit 1;
+    Type 12;
+    Color col1;
+    Size 2;
+   Marker 1.21 0.787;
+    Unit 1;
+    Type 12;
+    Color col2;
+    Size 2;
+   Marker 1.21 0.717;
+    Unit 1;
+    Type 12;
+    Color col3;
+    Size 2;
+  NoDTitle.
+
+elseif levels3=4
+
+kkname vname1 var1
+kkname vname2 var2
+kkname vname3 var3
+
+text tally5 tally5
+
+let lname1=left(tally5[1],10)
+let lname2=left(tally5[2],10)
+let lname3=left(tally5[3],10)
+let lname4=left(tally5[4],10)
+
+let col1=colr[1]
+let col2=colr[2]
+let col3=colr[3]
+let col4=colr[4]
+
+Plot xmin * ymin;
+  Scale 1;
+LDisplay 1 0 1 0;
+    MODEL 1;
+    tick t1;
+    label l1;
+      Min 0;
+      Max 1;
+    EndMODEL;
+  Scale 2;
+LDisplay 1 0 1 0;
+   angle 90;
+    MODEL 1;
+    tick t2;
+    label l2;
+      Min 0;
+      Max 1;
+    EndMODEL;
+  AxLabel 1 vname1;
+    ADisplay 1;
+    offset 0 .0001;
+  AxLabel 2 vname2;
+    ADisplay 1;
+    offset 0 .015;
+  NoJitter;
+  Data .15 .69 .14 .8733;
+    Type 0;
+    Color 0;
+    etype 0;
+    ecolor 0;
+  Symbol;
+    Type 0;
+    Size 1;
+  Footnote;
+    FPanel;
+  title "Mosaic Plot";
+Offset -0.08 -0.0508702935526768;
+ Rectangle 1.15 0.59 1.48 1;
+    Unit 1;
+    Type 1;
+    Color 0;
+   Text 1.24 0.96 vname3;
+    Unit 1;
+     Box 1.24 1.49 0.92 0.96;
+     tcolor 1;
+    Angle 0;
+    Offset 0 0;
+    Bold;
+   Text 1.265 0.89 lname1;
+    Unit 1;
+     Box 1.265 1.49 0.84 0.88;
+     tcolor 1;
+   Text 1.265 0.89 lname2;
+    Unit 1;
+     Box 1.265 1.49 .77 .81;
+     tcolor 1;
+    Angle 0;
+    Offset 0 0;
+    Text 1.265 0.89 lname3;
+    Unit 1;
+     Box 1.265 1.49 .7 .74;
+     tcolor 1;
+    Angle 0;
+    Offset 0 0;
+    Text 1.265 0.89 lname4;
+    Unit 1;
+     Box 1.265 1.49 .63 .67;
+     tcolor 1;
+    Angle 0;
+    Offset 0 0;
+   Marker 1.21 0.857;
+    Unit 1;
+    Type 12;
+    Color col1;
+    Size 2;
+   Marker 1.21 0.787;
+    Unit 1;
+    Type 12;
+    Color col2;
+    Size 2;
+   Marker 1.21 0.717;
+    Unit 1;
+    Type 12;
+    Color col3;
+    Size 2;
+   Marker 1.21 0.647;
+    Unit 1;
+    Type 12;
+    Color col4;
+    Size 2;
+  NoDTitle.
+
+elseif levels3=5
+
+kkname vname1 var1
+kkname vname2 var2
+kkname vname3 var3
+
+text tally5 tally5
+
+let lname1=left(tally5[1],10)
+let lname2=left(tally5[2],10)
+let lname3=left(tally5[3],10)
+let lname4=left(tally5[4],10)
+let lname5=left(tally5[5],10)
+
+let col1=colr[1]
+let col2=colr[2]
+let col3=colr[3]
+let col4=colr[4]
+let col5=colr[5]
+
+Plot xmin * ymin;
+  Scale 1;
+LDisplay 1 0 1 0;
+    MODEL 1;
+    tick t1;
+    label l1;
+      Min 0;
+      Max 1;
+    EndMODEL;
+  Scale 2;
+LDisplay 1 0 1 0;
+   angle 90;
+    MODEL 1;
+    tick t2;
+    label l2;
+      Min 0;
+      Max 1;
+    EndMODEL;
+  AxLabel 1 vname1;
+    ADisplay 1;
+    offset 0 .0001;
+  AxLabel 2 vname2;
+    ADisplay 1;
+    offset 0 .015;
+  NoJitter;
+  Data .15 .69 .14 .8733;
+    Type 0;
+    Color 0;
+    etype 0;
+    ecolor 0;
+  Symbol;
+    Type 0;
+    Size 1;
+  Footnote;
+    FPanel;
+  title "Mosaic Plot";
+Offset -0.08 -0.0508702935526768;
+ Rectangle 1.15 0.52 1.48 1;
+    Unit 1;
+    Type 1;
+    Color 0;
+   Text 1.24 0.96 vname3;
+    Unit 1;
+     Box 1.24 1.49 0.92 0.96;
+     tcolor 1;
+    Angle 0;
+    Offset 0 0;
+    Bold;
+   Text 1.265 0.89 lname1;
+    Unit 1;
+     Box 1.265 1.49 0.84 0.88;
+     tcolor 1;
+   Text 1.265 0.89 lname2;
+    Unit 1;
+     Box 1.265 1.49 .77 .81;
+     tcolor 1;
+    Angle 0;
+    Offset 0 0;
+    Text 1.265 0.89 lname3;
+    Unit 1;
+     Box 1.265 1.49 .7 .74;
+     tcolor 1;
+    Angle 0;
+    Offset 0 0;
+    Text 1.265 0.89 lname4;
+    Unit 1;
+     Box 1.265 1.49 .63 .67;
+     tcolor 1;
+    Angle 0;
+    Offset 0 0;
+    Text 1.265 0.89 lname5;
+    Unit 1;
+     Box 1.265 1.49 .56 .6;
+     tcolor 1;
+    Angle 0;
+    Offset 0 0;
+   Marker 1.21 0.857;
+    Unit 1;
+    Type 12;
+    Color col1;
+    Size 2;
+   Marker 1.21 0.787;
+    Unit 1;
+    Type 12;
+    Color col2;
+    Size 2;
+   Marker 1.21 0.717;
+    Unit 1;
+    Type 12;
+    Color col3;
+    Size 2;
+   Marker 1.21 0.647;
+    Unit 1;
+    Type 12;
+    Color col4;
+    Size 2;
+     Marker 1.21 0.577;
+    Unit 1;
+    Type 12;
+    Color col5;
+    Size 2;
+  NoDTitle.
+
+endif
+
+endlayout
+endmtitle
+endmacro

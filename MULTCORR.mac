@@ -1,0 +1,91 @@
+macro
+
+#     Name:  MultCorr.MAC
+#   Author:  Andy Haines
+#  Version:  Minitab 18
+#
+###########################################################################
+#
+#  This macro regresses each of the p input columns against the other p - 1 
+#  to get an R^2 value. It then calculates the positive square root of the 
+#  R^2 values to get p coefficients of multiple correlation, and stores 
+#  those values in the specified column.
+#
+#  Suppose your data are in C1-C5, and you want to store the coefficients of
+#  of multiple correlation in C6 and the names of the columns that were used
+#  as the response in C7. Go to Edit > Command Line Editor and type 
+#
+#  %MULTCORR C1-C5;
+#  STORE C6 C7.
+#
+#  Click on Submit Commands.
+#
+###########################################################################
+#
+#  Neither Minitab, Inc. nor the author(s) of this MACRO makes any claim 
+#  of or offers any Warranty whatsoever with regard to the accuracy of 
+#  this MACRO or its suitability for use.  Minitab, Inc. and the author(s)
+#  of this MACRO each hereby disclaims any Warranty and/or liability with 
+#  respect thereto. 
+#
+###########################################################################
+multcorr x.1-x.n;
+  store c respname.
+
+mcolumn x.1-x.n xx.1-xx.n c res tot r2 respname 
+mconstant i j k mu sstot ssres rname
+
+mreset
+noecho
+brief 0
+notitle
+endmtitle
+
+erase c respname
+
+do i = 1:n
+
+  copy 1 k
+
+  do j = 1:n
+    if j <> i
+      copy x.j xx.k
+      add 1 k k
+    endif
+  enddo
+
+  subt 1 k k
+  kkname rname x.i
+  regress;
+    response x.i;
+    contin xx.1-xx.k;
+    terms xx.1-xx.k;
+    nodefault;
+    resi res.
+
+  mean x.i mu
+  subt mu x.i tot
+  mult tot tot tot
+  sum tot sstot
+
+  mult res res res
+  sum res ssres
+
+  let r2 = 1 - (ssres/sstot)
+  stack C r2 C
+  stack respname rname respname
+enddo
+
+let C = sqrt(C)
+name C "Coefficient of Multiple Correlation"
+text C C 
+stack "Coefficient of Multiple Correlation" C C
+stack "Variables" respname respname
+
+Mtitle " Coefficients of Multiple Correlation";
+  notitle.
+brief 2
+write respname C 
+endmtitle
+
+endmacro

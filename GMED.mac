@@ -1,0 +1,80 @@
+macro
+###########################################################################
+#
+#       Macro: GMED.MAC
+#  Written by: Cathy Akritas, August 2002
+#     Version: Minitab 18
+#
+#  This macro calculates the median of grouped or tabled data.  
+#
+#  Suppose you are tracking the number of incoming calls to your help 
+#  line every hour for the first 4 hours of the day.  The hours are in C1 
+#  and the frequencies are in C2.  10 people called in the first hour, 15 
+#  calls in the second hour, 9 calls in the third hour, and 10 calls in 
+#  the 4th hour.   
+#  
+#    C1    C2
+#  Hours  Freqs
+#    1     10
+#    2     15
+#    3      9
+#    4     10
+#
+#  To get the median of the data set above, choose Edit > Command Line 
+#  Editor.  Type the command 
+#
+#  %gmed C1 C2
+#
+#  Click on Submit Commands.  
+#  The median of the data set is printed in the Session Window.
+#
+###########################################################################
+#
+#  Neither Minitab, Inc. nor the author(s) of this MACRO makes any claim 
+#  of or offers any Warranty whatsoever with regard to the accuracy of 
+#  this MACRO or its suitability for use.  Minitab, Inc. and the author(s)
+#  of this MACRO each hereby disclaims any Warranty and/or liability with 
+#  respect thereto. 
+#
+###########################################################################
+
+gmed x f 
+mcolumn x f cums ind equal a b 
+mconstant pos cond median
+
+mreset 
+noecho
+brief 0
+notitle
+endmtitle
+
+sort x f a b;
+by x.
+
+let cums = parsum(b)
+let pos = sum(b)/2
+let equal = (cums = pos)
+let cond = sum(equal)
+if cond = 0
+  let ind = (cums > pos)
+  let ind = ind*a
+  copy ind ind;
+    omit ind = 0.
+  copy ind Median;
+    use 1.
+else 
+  let ind = (cums ge pos)
+  let ind = ind*a
+  copy ind ind;
+    omit ind = 0.
+  copy ind Median;
+    use 1 2.
+  let Median = sum(Median)/2
+endif
+name median "Median = "
+mtitle "Median of Frequency Table Data";
+  notitle.
+brief 2
+Print Median
+endmtitle
+endmacro

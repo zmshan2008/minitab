@@ -1,0 +1,149 @@
+GMACRO
+
+#**************************************************************************
+#
+# Macro:             PRESS.MAC
+# Final MTB Date:    07/07/05
+# First MTB Date:    03/18/94
+#         Verion:    Minitab 18
+# Author:            Mike Delozier
+#                    Minitab Inc.
+#                    1829 Pine Hall Road
+#                    State College, PA  16801
+#
+#**************************************************************************
+#
+#  This macro computes the model fits, residuals, deleted fits, deleted
+#  (PRESS) residuals, and the PRESS statistic in the original units of the 
+#  response when a power transformation of the response is applied in a 
+#  linear regression.
+#
+#  Prior to running the macro, you must show the Command Line window to 
+#  display the MTB> prompt.  To display, click anywhere in the Session 
+#  window and choose Editor > Show Command Line.  The Command Line window, 
+#  will be displayed to the right of the Session Window.
+#
+#  To run the macro, type
+#  
+#  %PRESS
+#
+#  at the MTB> prompt in the Command Line window and press Enter.
+#
+#  The macro will then, in turn, prompt for the number of predictor 
+#  variables in the regression, the column numbers(s) of the 
+#  predictor(s), the column number for the response, and the power 
+#  transformation parameter value.
+#
+#**************************************************************************
+#
+#  Neither Minitab, Inc. nor the author(s) of this MACRO makes any claim 
+#  of or offers any Warranty whatsoever with regard to the accuracy of 
+#  this MACRO or its suitability for use.  Minitab, Inc. and the author(s)
+#  of this MACRO each hereby disclaims any Warranty and/or liability with 
+#  respect thereto. 
+#
+#**************************************************************************
+
+press
+
+mreset
+notitle
+endmtitle
+noecho 
+
+note
+note Please enter the number of predictors in the regression...
+set c309;
+file 'terminal';
+nobs 1.
+end
+copy c309 k57
+note
+note  Below, please enter the column numbers, 
+note  like 1 or 12 not C1 or C12.
+note 
+note  Press Enter after each column number.
+note
+do k51 = 1:k57
+note
+note Please enter column number of predictor...
+set c310;
+file 'terminal';
+nobs 1.
+end
+copy c310 k58
+let k59 = 319+k51
+let ck59 = ck58
+enddo
+note
+note Please enter column number of response...
+set c309;
+file "terminal";
+nobs 1.
+end
+copy c309 k60
+let c305 = ck60
+note
+note Please enter response power transformation parameter value...
+set c309;
+file 'terminal';
+nobs 1.
+copy c309 k100
+if k100 ne 0
+goto 100
+endif
+let c307 = loge(c305)
+brief 0
+regress;
+  response c307;
+  continuous c320-ck59;
+  terms c320 -ck59; 
+  residuals c308;
+  fits c315;
+  hi c314.
+let c315 = exponentiate(c315)
+let c316 = c307-(c308/(1-c314))
+let c316 = exponentiate(c316)
+let c308 = c305-c315
+let c317 = c305-c316
+
+mtitle "PRESS Statistic Macro Output";
+  notitle.
+brief 1
+Print "FITS, RESIDUALS, AND PRESS IN THE ORIGINAL SCALE ..."
+name c305 'OBS' c315 'FITS' c308 'RES' c316 'DELFITS' c317 'DELRES'
+print c305 c315 c308 c316 c317
+name k25 "PRESS Statistic: "
+
+let k25 = ssq(c317)
+print k25
+endmtitle
+goto 200
+mlabel 100
+let c307 = c305**k100
+brief 0
+regress;
+  response c307; 
+  continuous c320 - ck59;
+  terms c320-ck59;
+  residuals c308;
+  fits c315;
+  hi c314.
+let c315 = c315**(1/k100)
+let c316 = (c307-(c308/(1-c314)))**(1/k100)
+let c308 = c305-c315
+let c317 = c305-c316
+
+mtitle "PRESS Statistic Macro Output";
+  notitle.
+brief 1
+Print " FITS, RESIDUALS, AND PRESS IN THE ORIGINAL SCALE ..."
+name c305 'OBS' c315 'FITS' c308 'RES' c316 'DELFITS' c317 'DELRES'
+print c305 c315 c308 c316 c317
+name k25 "PRESS Statistic: "
+let k25 = ssq(c317)
+print k25
+mlabel 200
+endmtitle
+erase k25 - k100 c304 - c322
+ENDMACRO

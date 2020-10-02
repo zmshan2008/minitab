@@ -1,0 +1,78 @@
+macro
+#  
+#       Macro:  REGJACK.MAC
+#  Written by:  Cathy Akritas  August 2005
+#
+#  This macro is a simple example of using jackknife techniques to obtain 
+#  the MSE and coefficients from regression.  For each iteration, a row of 
+#  data is excluded, a regression analysis is performed on this reduced 
+#  data set, the MSE and coefficients are stored.  The process is repeated 
+#  for each row of data.  All of the MSEs and coefficients for each 
+#  iteration are displayed in a table in the Session window.
+#
+#  Suppose your response data is in C1, and your predictors are in C2 - C5 
+#  Go to Edit > Command Line Editor... and type the command
+#
+#  %regjack C1 C2 - C5
+#
+#  Click on "Submit Commands". 
+#
+#  Note:  Your predictors must be in consecutive columns like c1 - c3 or 
+#         c9 - c25 for the macro to run properly.  
+#
+###########################################################################
+#
+#  Neither Minitab, Inc. nor the author(s) of this MACRO makes any claim 
+#  of or offers any Warranty whatsoever with regard to the accuracy of 
+#  this MACRO or its suitability for use.  Minitab, Inc. and the author(s)
+#  of this MACRO each hereby disclaims any Warranty and/or liability with 
+#  respect thereto. 
+#
+###########################################################################
+
+regjack y x.1-x.n
+
+mcolumn y x.1 -x.n Beta0 Slopes.1 -Slopes.n y1 x1.1-x1.n temp temp2 errs b
+mconstant i j cnt e xname nm1 nm2
+
+mreset
+noecho  
+notitle                
+brief 0	
+ow 130
+                
+let cnt = count(y)      
+
+do i = 1:cnt
+  copy y x.1-x.n y1 x1.1-x1.n;  
+    exclude;                     
+      rows i.
+  regress;
+    response y1;
+    contin x1.1-x1.n;
+    terms X1.1-x1.n;
+    nodefault;
+    coeff b;
+    mse e.
+  stack temp b temp
+  stack errs e errs
+enddo 
+
+let j = n+1
+set temp2
+  cnt(1:j)
+end
+unstack temp Beta0 Slopes.1 - Slopes.n;
+  subs temp2.
+name Errs 'MSEs' Beta0 'Constants' 
+kkset nm1 "Coeffs: "
+do i = 1:n
+  kkname xname x.i
+  kkcat nm1 xname nm2
+  name Slopes.i nm2
+enddo
+brief 2
+mtitle "Regression results leaving out one row of data at a time"
+print Errs Beta0 Slopes.1 - Slopes.n
+
+endmacro

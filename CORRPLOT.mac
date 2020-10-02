@@ -1,0 +1,565 @@
+macro
+#
+#        Macro:  CORRPLOT.MAC
+#       Author:  Cathy Akritas
+# 
+#      Version:  Minitab 17 and 18
+#
+#  This macro produces a correlation plot for evaluating the orthogonality of a
+#  designed experiment. Correlation plots are typically used for screening experiments 
+#  to evaluate the alias structure but can be used for other designs, as well. The
+#  pairwise correlation between potential model terms is plotted using colored
+#  squares. The 45 degree diagonal of the plot has correlation of 1 since this 
+#  represents the correlation of the term with itself. All other plotted squares
+#  on the graph are colored based on the magnitude of the correlation. Potential 
+#  model terms are the main effects, the squared terms, and the 2-way interactions.
+#  
+#  By default, the macro produces the correlation plot based on the absolute value of the 
+#  correlations between the main effects only. Optional subcommands are available to add 
+#  the squared terms, or the interactions, or the full quadratic model and to use the 
+#  correlations without taking the absolute value first.  
+#  
+#  For example, for a 6 factor design saved in C5 - C10, go to Edit > Command Line Editor
+#  and type the commands below.  
+#
+#  %CORRPLOT C5 - C10
+#
+#  Click Submit Commands. This creates the correlation plot for the main effects only.  
+#
+#  To plot the main effects and the squared terms, use the command and subcommand below.
+#  
+#  %CORRPLOT C5 - C10;
+#   SQUARES. 
+#  
+#  To plot the main effects and the interactions, use the command and subcommand below.
+#  
+#  %CORRPLOT C5 - C10;
+#   INTERACTS. 
+#
+#  To plot the main effects, the interactions, and the squared terms, use the 
+#  command and subcommand below.
+#  
+#  %CORRPLOT C5 - C10;
+#   FULL. 
+#  
+#  Use only one of the subcommands SQUARES, INTERACTS, or FULL at a time.  
+#
+#  The subcommand EXPAND displays the color legend from -1 to 1, instead of the 
+#  default 0 to 1.  For example, to create the correlation plot for the main 
+#  effects and the interactions using the expanded legend, use the commands below.  
+#
+#  %CORRPLOT C5 - C10;
+#   INTERACT;
+#   EXPAND.  
+#
+#  When requesting the main effects or the main effects with the squared terms, 
+#  the maximum number of factors is 48. When requesting the main effects with the 
+#  interactions or the full quadratic model, the maximum number of factors is 
+#  limited to 21.  
+#
+#  Missing values are not allowed.  
+#
+Corrplot X.1 - X.n;  
+Squares;   #Limited to 48 factors when fitting Linear + Squared terms
+interacts; #Limited to 21 factors when fitting Linear + 2-way Interaction terms
+full;      #Limited to 21 factors when fitting Linear + Squared + 2-way Interaction terms
+expand.
+
+mcolumn X.1 - X.n Y.1 - Y.253 Xaxis Yaxis t1 t2 xlabs ylabs tlabs Rs temp group
+mcolumn xcoords ycoords gradient legx legy legcol Xall Xgroups Ss Ns error1 xerr yerr
+mconstant g i j k m p q a b symsize test fn1 
+mmatrix cormtx 
+
+mreset
+noecho
+notitle
+brief 0
+
+let fn1 = ""
+let test = squares+interacts+full
+
+if test > 1
+  set Xerr
+    6(.5)
+  end
+  set Yerr
+    .75 .65 .55 .45 .35 .15
+  end
+  Tset error1
+    "Use only one of the subcommands: SQUARES, INTERACTS, FULL."
+    "For example, to create the correlation plot for an "
+    "8 factor design including the interactions,"
+    "use the command/subcommand below."
+    "%Corrplot C5 - C12;"
+    "   ***   Macro is Exiting   ***   ";
+  end
+  Layout;
+    wtitle "Correlation Plot Macro Input Error";
+    graph;
+      type 1;
+      color 46;
+    title " ";
+    title "  ";
+    title "  ";
+    title "  *  Correlation Plot Macro Input Error  *  ";
+      psize 20;
+    text xerr yerr error1;
+      psize 14;
+      placement 0 0;
+    text .39 .285 "Interacts."; 
+      psize 14.
+  endlay
+  brief 2
+  exit
+endif
+
+if (Interacts=1 and n>21) or (full=1 and n>21)
+  set Xerr
+    3(.5)
+  end
+  set Yerr
+    .7 .6  .2
+  end
+  Tset error1
+    "When requesting the two-way interactions or the full quadratic"
+    "model, the maximum number of factors is 21."
+    "   ***   Macro is Exiting   ***   "
+  end
+  Layout;
+    wtitle "Correlation Plot Macro Input Error";
+    graph;
+      type 1;
+      color 46;
+    title " ";
+    title "  ";
+    title "  ";
+    title "  *  Correlation Plot Macro Input Error  *  ";
+      psize 20;
+    text xerr yerr error1;
+      psize 14;
+      placement 0 0.
+  endlay  
+  brief 2
+  exit
+elseif n > 48
+  set Xerr
+    3(.5)
+  end
+  set Yerr
+    .7 .6  .2
+  end
+  Tset error1
+    "When requesting the main effects or the main effects with"
+    "the squared terms, the maximum number of factors is 48."
+    "   ***   Macro is Exiting   ***   "
+  end
+  Layout;
+    wtitle "Correlation Plot Macro Input Error";
+    graph;
+      type 1;
+      color 46;
+    title " ";
+    title "  ";
+    title "  ";
+    title "  *  Correlation Plot Macro Input Error  *  ";
+      psize 20;
+    text xerr yerr error1;
+      psize 14;
+      placement 0 0.
+  endlay  
+  brief 2
+  exit
+endif
+
+#All columns must be numeric 
+do i = 1:n
+  dtype x.i b
+  if b = 0 or b = 10
+    let a = '*'
+  else
+    let a = stdev(x.i)
+  endif     
+  if (a = 0 or a = '*') or (b = 3)
+    set Xerr
+      3(.2)
+    end
+    set Yerr
+      .7 .6 .5  
+    end
+    Tset error1
+      "Factors must be numeric."
+      "Factors must contain data."
+      "Factors must contain at least 2 unique values."
+    end
+    Layout;
+      wtitle "Correlation Plot Macro Input Error";
+      graph;
+        type 1;
+        color 46;
+      title " ";
+      title "  ";
+      title "  ";
+      title "  *  Correlation Plot Macro Input Error  *  ";
+        psize 20;
+      text xerr yerr error1;
+        psize 14;
+      text .5 .2     "   ***   Macro is Exiting   ***   ";
+        psize 14;
+        placement 0 0.
+    endlay  
+    brief 2
+    exit
+  endif
+enddo
+
+stack X.1 - X.n Xall;
+  subs Xgroups;
+  usenames.
+vorder Xgroups;
+  worksheet.  
+Stat Xall;
+  By Xgroups;
+  Gvalues Xlabs;
+  N Ns.
+
+#All columns must have the same length
+If stdev(Ns) <> 0
+  set Xerr
+    4(.5)
+  end
+  set Yerr
+    .7 .6 .4 .2
+  end
+  Tset error1
+    "At least one of the factors has a different number"
+    "of rows than the other factors."
+    "Or one of the factors contains a missing value."
+    "   ***   Macro is Exiting   ***   "
+  end
+  Layout;
+    wtitle "Correlation Plot Macro Input Error";
+    graph;
+      type 1;
+      color 46;
+    title " ";
+    title "  ";
+    title "  ";
+    title "  *  Correlation Plot Macro Input Error  *  ";
+      psize 20;
+    text xerr yerr error1;
+      psize 14;
+      placement 0 0.
+  endlay  
+  brief 2
+  exit
+endif  
+
+let m = n*(n-1)/2
+let a = n - 1
+
+if test = 0  #Calculate the correlations using just the main effects
+  let q = n
+    set Xcoords
+      (1:q)q
+    end
+    set Ycoords
+      q(1:q)
+    end
+  correlation x.1 - x.n cormtx
+  copy cormtx y.1-y.n
+
+elseif squares = 1
+  let q = 2*n
+  let group[n] = '*'
+  set t1   ###because 48 is the max number of factors when fitting the squared terms
+    1:48
+  end
+
+  tset t2
+  "A" "B" "C" "D" "E" "F" "G" "H" "J" "K" "L" "M" "N" "O" "P" "Q" "R" "S" "T" "U" "V" 
+  "W" "X" "Y" "Z" "A1" "B1" "C1" "D1" "E1" "F1" "G1" "H1" "J1" "K1" "L1" "M1" "N1" "O1" 
+  "P1" "Q1" "R1" "S1" "T1" "U1" "V1" "W1" "X1" 
+  end
+
+  Copy t2 t2;
+    Include;
+    rows 1:n.
+  
+  let ylabs = concat(t2,t2)
+  stack t2 ylabs xlabs
+  let k = 0  
+
+  do i = 1:n
+    let temp = stdev(abso(X.i))
+    if temp = 0 
+      let k = k + 1
+      let group[i] = i
+    else
+      let y.i = X.i*X.i
+    endif
+  enddo
+  let q = q - k
+  n group g
+  if g = n 
+    #no squared terms can be fit
+    correlation x.1 - x.n cormtx
+    copy cormtx y.1-y.n
+    let fn1 = "Quadratic terms that cannot be fit were removed"
+  elseif g > 0  
+    let k = n-k
+    correlation x.1 - x.n y.1 - y.k cormtx
+    copy cormtx y.1-y.q
+    copy t2 t2;
+      exclude;
+      where "group <> '*'".
+    let fn1 = "Quadratic terms that cannot be fit were removed"
+  else 
+    correlation x.1 - x.n y.1 - y.n cormtx
+    copy cormtx y.1-y.q
+  endif
+  
+    set Xcoords
+      (1:q)q
+    end
+    set Ycoords
+      q(1:q)
+    end
+  set Xaxis
+    (1:q)
+  end
+  set Yaxis
+    (1:q) 
+  end
+ 
+elseif interacts = 1
+  let q = n + m
+  set Xaxis
+    (1:n)n
+  end
+  set Yaxis
+    (1:n) a(1:n)
+  end
+
+  set t1   ###because 21 is the max number of factors
+    1:21
+  end
+
+  tset t2
+  "A" "B" "C" "D" "E" "F" "G" "H" "J" "K" "L" "M" "N" "O" "P" "Q" "R" "S" "T" "U" "V"
+  end
+
+  Convert t1 t2 Xaxis Xlabs
+  Convert t1 t2 Yaxis Ylabs
+  Lag n xlabs xlabs
+  copy xlabs ylabs xlabs ylabs;
+    exclude;
+    where "Xlabs >= Ylabs".
+  Let xlabs = concat(xlabs, ylabs)
+  set Xcoords
+    (1:q)q
+  end
+  set Ycoords
+    q(1:q)
+  end
+  #create the interactions
+  let k = 0 
+  do i = 1:a
+    let b = i + 1
+    do j = b:n
+      let k = k + 1
+      let y.k = X.i*X.j
+    enddo
+  enddo
+
+  correlation x.1-x.n Y.1 - Y.m cormtx
+  copy cormtx y.1-y.q
+
+elseif full = 1
+  let q = 2*n + m
+  let k = 0
+  let group[n] = '*'
+  set t1   ###The max number of factors is 21 when fitting full model
+    1:21
+  end
+
+  tset t2
+  "A" "B" "C" "D" "E" "F" "G" "H" "J" "K" "L" "M" "N" "O" "P"
+  "Q" "R" "S" "T" "U" "V" 
+  end
+
+  Copy t1 t2 t1 t2;
+    Include;
+    rows 1:n.
+  let tlabs = concat(t2,t2)
+  #create the interactions
+  do i = 1:a
+    let b = i + 1
+    do j = b:n
+      let k = k + 1
+      let y.k = X.i*X.j
+    enddo
+  enddo
+
+  let k = m  #m=no. of interactions
+  do i = 1:n    
+    let temp = stdev(abso(X.i))
+    if temp = 0 
+      let group[i] = i
+    else
+      let k = k + 1  #is the total of interaction and squares.
+      let y.k = X.i*X.i
+    endif
+  enddo
+  let q = n + k  #reduce the total number of terms
+  n group g
+  if g = n 
+    #no squared terms can be fit
+    let fn1 = "Quadratic terms that cannot be fit were removed"
+  elseif g > 0  
+    copy tlabs tlabs;
+      exclude;
+      where "group <> '*'".
+    let fn1 = "Quadratic terms that cannot be fit were removed"
+  endif
+
+    set Xcoords
+      (1:q)q
+    end
+    set Ycoords
+      q(1:q)
+    end
+
+  set Xaxis
+    (1:n)n
+  end
+  set Yaxis
+    (1:n) a(1:n)
+  end
+  correlation x.1-x.n Y.1 - Y.k cormtx
+  copy cormtx y.1-y.q
+  Convert t1 t2 Xaxis Xlabs
+  Convert t1 t2 Yaxis Ylabs
+  copy xlabs ylabs xlabs ylabs;
+    exclude;
+    where "Xlabs >= Ylabs".
+  Let xlabs = concat(xlabs, ylabs)
+  stack t2 xlabs tlabs xlabs
+  set Xcoords
+    (1:q)q
+  end
+  set Ycoords
+    q(1:q)
+  end
+endif
+
+stack Y.1 - Y.q Rs
+
+if expand = 0
+let Rs = abso(round(Rs,7))
+  code (0)23 (.00000001:.16666667)70 (.16666668:.33333333)78 (.33333334:.5)127 &
+  (.50000001:.66666667)126 (.66666668:.88888883)103 (.88888884:.99999999)64 (1)72 Rs gradient
+  set legcol
+    23 70 78 127 126 103 64 72
+  end
+  set legy
+    0:1.001/0.166666667
+  end
+  set legx 
+    7(1)
+  end
+else 
+  let Rs = round(Rs, 7)
+  code (-1)24 (-.99999999:-.83333334)25(-.83333333:-.50000001)29 (-.5:-.33333334)30 &
+  (-.33333333:-.16666668)31 (-.16666667:-.00000001)115 (0)23 (.00000001:.16666667)70 &
+  (.16666668:.33333333)78 (.33333334:.5)127 (.50000001:.66666667)126 (.66666668:.83333333)103 & 
+  (.83333334:.99999999)64 (1)72 Rs gradient
+
+  set legcol
+    24 25 29 30 31 115 23 70 78 127 126 103 64 72
+  end
+  set legy
+    -1:1.01/0.16666667
+  end
+  set legx 
+    13(1)
+  end
+endif
+
+let symsize = 100/q   
+let p = q + .5
+ 
+layout;
+  wtitle "Correlation Plot";
+  title "Correlation Plot";
+  graph 8 8;
+    type 0.
+
+  Plot ycoords*Xcoords;
+    graph 8 8;
+    data .065 .967 .1 .975;
+    scale 1;
+      mini .5;
+      maxi p;
+      label Xlabs;
+      psize 6;  
+      tick 1:q;
+    scale 2;
+      psize 6;
+      mini .5;
+      maxi p;
+     label xlabs;
+      psize 6;
+      tick 1:q;
+    NoDTitle;
+    AxLab 1 " ";
+    Axlab 2 " ";
+    Symbol;
+      size symsize;  
+      Type 12;
+      color gradient;
+    footnote fn1.
+if expand = 0
+  plot legy*legx;
+    title "    |r|";
+      psize 38;
+      figure .955 .9985 .65 .9725;
+    scale 1;
+      ldisplay 0 0 0 0;
+      mini .5;
+      maxi 1.5;
+    scale 2;
+      ldisplay 0 0 0 0;
+      hdisplay 0 0 1 0;
+      label "0" " " "1";
+    NoDTitle;
+    NoPerFoot;
+    AxLab 1 " ";
+    Axlab 2 " ";
+    symbol;
+      color legcol;
+      type 12;
+      size 36.
+else
+  plot legy*legx;
+    title "    r";
+      psize 38;
+      figure .955 .9985 .65 .9725;
+    scale 1;
+      ldisplay 0 0 0 0;
+      mini .5;
+      maxi 1.5;
+    scale 2;
+      ldisplay 0 0 0 0;
+      hdisplay 0 0 1 0;
+      label "-1" "0" "1";
+    NoDTitle;
+    NoPerFoot;
+    AxLab 1 " ";
+    Axlab 2 " ";
+    symbol;
+      color legcol;
+      type 12;
+      size 16.
+endif
+endlayout
+endmacro

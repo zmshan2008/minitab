@@ -1,0 +1,50 @@
+macro
+
+############################################################### 
+#
+#     Name:  CCFLOOP.MAC 
+#   Author:  Andy Haines
+#  Version:  Minitab 18
+#
+#  This macro computes cross correlations for two or more pairs of columns.
+#  
+#  Suppose the data is in C1, C2, . . . C10 and you want the cross
+#  correlations for all the pairs of columns.  Choose Edit > Command Line 
+#  Editor and type 
+#  
+#  %ccfloop C1-C10
+#  
+#  Click on Submit Commands.
+# 
+#  The dash in C1-C10 is a shortcut you could use if the variables are in 
+#  consecutive columns.  If the columns are not consecutive, list each 
+#  variable with a space in between each (for example, %ccfloop C1 C4 C7 
+#  C9).
+#
+###########################################################################
+#
+#  Neither Minitab, Inc. nor the author(s) of this MACRO makes any claim 
+#  of or offers any Warranty whatsoever with regard to the accuracy of 
+#  this MACRO or its suitability for use.  Minitab, Inc. and the author(s)
+#  of this MACRO each hereby disclaims any Warranty and/or liability with 
+#  respect thereto. 
+#
+###########################################################################
+ccfloop a.1-a.N
+
+mcolumn a.1-a.N
+mconstant i j k m
+
+mreset
+noecho
+
+let m = N-1
+do j = 1:m
+  let k = j+1
+  if k <= N
+    do i = k:N
+      ccf a.j a.i 
+    enddo
+  endif
+enddo
+endmacro

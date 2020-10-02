@@ -1,0 +1,83 @@
+macro
+############################################################### 
+#
+#    Macro:  STRAT.MAC
+#  Version:  Minitab 18
+#
+#  This macro generates a stratified random sample.
+#  
+#  Suppose your data is in C1, the group indicator is in C2 and you want 
+#  to sample 5 observations from each group.  Also you want to store the 
+#  samples in C5 and the group indicator in C6.  Go to Edit > Command Line 
+#  Editor...  type the command
+#
+#  %strat C1 C2 5 C5 C6
+#  
+#  Click on Submit Commands. 
+#
+#  The macro will store the samples in C5 and C6 of your current worksheet.
+#
+###########################################################################
+#
+#  Neither Minitab, Inc. nor the author(s) of this MACRO makes any claim 
+#  of or offers any Warranty whatsoever with regard to the accuracy of 
+#  this MACRO or its suitability for use.  Minitab, Inc. and the author(s)
+#  of this MACRO each hereby disclaims any Warranty and/or liability with 
+#  respect thereto. 
+#
+###########################################################################
+
+strat Data Group SampSize NewData NewGroup
+mcolumns   Group Selected OrigRow SortGrp RowInGrp MinRow Data NewData NewGroup
+mconstants SampSize RowCt
+
+mreset
+brief 0
+noecho
+notitle
+endmtitle
+
+#
+# Keep track of the original row numbers.
+#
+count Group RowCt
+set OrigRow
+1:RowCt
+end
+
+#
+# Randomize the order of rows within each group.
+#
+sample RowCt OrigRow Group OrigRow SortGrp
+
+#
+# Number the rows within each group.
+#
+sort SortGrp OrigRow SortGrp OrigRow
+
+set RowInGrp
+1:RowCt
+end
+
+stat RowInGrp;
+ by SortGrp;
+ expand;
+ minimum MinRow.
+
+let RowInGrp = RowInGrp - MinRow + 1
+
+#
+# Select the first SampSize rows in each group
+#
+let Selected = RowInGrp <= SampSize
+
+#
+# Back to the original order.
+#
+sort Selected Selected;
+ by OrigRow.
+
+Copy Data Group NewData NewGroup;
+Use Selected = 1.
+
+endmacro

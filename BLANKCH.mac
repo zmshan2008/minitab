@@ -1,0 +1,356 @@
+macro
+
+#    Name:  BLANKCH.MAC for Minitab 18
+#  Author:  Cathy Akritas modified on 05/11/2004  
+#
+#  This macro creates a blank Xbar or Individuals control chart where the
+#  control limits are based on historical information.  There are two 
+#  options for obtaining the control limits: calculate the control limits 
+#  based on a historical mean and a historical sigma, or directly input 
+#  the values for the historical upper and lower control limits.  
+#  
+#  This macro prompts you for information.  For this to work, you must 
+#  show the Command Line window prior to running the macro.  To show the 
+#  Command Line window, click anywhere in the Session window to make it the
+#  active window.  Go to the top menu bar, select Editor > Show Command Line.  
+#  The Session window is now segmented into two panes.  The pane on the right 
+#  is the Command Line window which displays the "MTB>" prompt.  
+#
+#  You will be asked for either the mean, sigma, and subgroup size, or the 
+#  mean, upper control limit, and lower control limit depending on the 
+#  method you choose for obtaining the control limits.  
+# 
+#  The macro will also ask you for the number of subgroups to be plotted
+#  on the chart, the X-axis label, the Y-axis label and the title for the
+#  chart.  
+#
+#  The optional subcommand DEFS puts the default X- and Y-axis labels on 
+#  the chart. 
+#
+###########################################################################
+#
+#  Neither Minitab, Inc. nor the author(s) of this MACRO makes any claim 
+#  of or offers any Warranty whatsoever with regard to the accuracy of 
+#  this MACRO or its suitability for use.  Minitab, Inc. and the author(s)
+#  of this MACRO each hereby disclaims any Warranty and/or liability with 
+#  respect thereto. 
+#
+###########################################################################
+blankch;
+defs.
+mconstant mu sigma upper lower xlabel ylabel ttl refup refmu reflo voff xtsz 
+mconstant xtick yinc ni ymin ymax refup1 reflo1 refmu1 xmax limit xtang yneg
+mconstant fn1 fn2 fn3 fn4 
+mcolumn data opt yticks
+
+noecho
+notitle
+endmtitle
+
+let limit = 0
+let ni=4
+Note    ***********************************************************************  
+Note    * This macro creates a blank Xbar or individuals control chart where  * 
+Note    * the control limits are based on historical information.  There are  *
+Note    * two options for obtaining the control limits: Calculate the control *
+Note    * limits based on a historical mean and historical sigma or directly  *
+Note    * input the values for the historical upper and lower control limits. *
+Note    ***********************************************************************
+mlabel 5
+Note
+Note    At the "Data>" prompt below,  
+Note    
+Note    Enter 1, if you want to create a blank control chart where the control
+Note    limits are calculated using a historical mean and historical sigma. The 
+Note    upper and lower control limits are calculated using the formulas below.  
+Note
+Note    UCL = mu+3*(sigma/sqrt(n)) and LCL = mu-3*(sigma/sqrt(n))
+Note
+Note
+Note    Enter 2, if you wish to create a blank control chart based on a
+Note    historical mean, and historical control limits.
+Note 
+
+set opt;
+  file 'terminal';
+  nobs 1.
+If opt = 1
+   Note
+   Note    Enter the value for the historical mean.  
+   Note    
+   set data;
+   file 'terminal';
+   nobs 1.
+   copy data mu 
+   mlabel 10
+   Note
+   Note    Enter the value for the historical sigma.  
+   Note    
+   set data;
+   file 'terminal';
+   nobs 1. 
+   copy data sigma
+   if sigma LE 0 
+      Note
+      Note    ***Sigma must be greater than 0.       ***
+      Note    ***Please re-enter the value for sigma.***
+      goto 10
+   else
+   endif
+   mlabel 12 
+   Note
+   Note    Enter the value for the subgroup size.  
+   Note    For an individuals chart use a subgroup size of 1.
+   Note    
+   set data;
+   file 'terminal';
+   nobs 1.
+   copy data ni
+   if ni < 1
+     Note
+     Note    ***The subgroup size has to be greater than or equal to 1.***
+     Note    ***Please re-enter the value for the subgroup size.       ***  
+     goto 12
+     else
+    endif
+   let upper = mu + 3*sigma/sqrt(ni)
+   let lower = mu - 3*sigma/sqrt(ni)
+   erase data
+   let fn1 = "Historical Sigma = "
+   copy sigma data 
+   text data data
+   copy data fn2
+   kkcat fn1 fn2 fn2
+   let fn3 = "Subgroup Size = "
+   copy ni data
+   text data data
+   copy data fn4
+   kkcat fn3 fn4 fn4
+   if lower < 0 and mu > 0
+     copy lower data
+     text data data
+     copy data reflo
+     let reflo1 = "LCL="
+     kkcat reflo1 reflo reflo
+     copy reflo data
+       Note   
+       Note  Using the formula above, and the historical mean and sigma, 
+       Note  the lower control limit was calculated to be a negative number.
+       Note
+###    write data
+       Note  Do you want to set the Lower Control Limit equal to 0, instead 
+       Note  of using the negative value? 
+       Note  At the Data> prompt below, for Yes enter 1 and for No enter 2, then press Enter.
+       Note    
+    set data;
+      file "terminal";
+      nobs 1. 
+       copy data limit
+          if limit = 1
+             let lower = 0
+          endif
+       endif
+
+elseif opt = 2
+   mlabel 15
+   Note 
+   Note   Enter the value for the historical upper control limit, UCL.  
+   Note
+   Set data;
+   file 'terminal';
+   nobs 1.  
+   copy data upper
+   Note 
+   Note   Enter the value for the historical lower control limit, LCL.  
+   Note
+   Set data;
+   file 'terminal';
+   nobs 1.  
+   copy data lower
+   Note 
+   Note   Enter the value for the historical mean, mu.
+   Note
+   Set data;
+   file 'terminal';
+   nobs 1.  
+   copy data mu 
+   let fn2 = " "
+   let fn4 = " "
+   if lower > mu or lower > upper
+      Note 
+      Note     ***You entered a LCL that is greater than mu or is greater than UCL***
+      Note     ***Please, re-enter the values, where the UCL > mu > LCL.*** 
+      Note  
+      goto 15
+   elseif upper < mu
+      Note 
+      Note    ***You entered a UCL that is less than mu. Please, re-enter***  
+      Note    ***the values, where the UCL > mu > LCL.***  
+      Note  
+      goto 15
+   endif    
+else
+   Note
+   Note    ***YOU MUST ENTER EITHER A 1 OR 2 AT THE "Data>" PROMPT***
+   Note
+   goto 5
+endif 
+
+let yinc = (upper-lower)/10
+let ymin = lower - yinc
+let ymax = upper + yinc
+set yticks
+  ymin:ymax/yinc
+end  
+  if ymin lt 0 and limit=1
+     let ymin = 0
+     set yticks
+         ymin:ymax/yinc
+     end  
+  elseif ymin < 0 and lower > 0
+     Note 
+     Note   The smallest tick mark for the y-axis is negative.  Do you wish to set 
+     Note   this to 0?  At the Data> prompt below, for Yes type 1 or for No type 1 and then hit Enter.  
+     Note
+     set data;
+        file "terminal";
+        nobs 1.
+     copy data yneg
+       if yneg =1 
+          let ymin = 0
+          let yinc = (upper-mu)/5
+          let ymax = upper+yinc
+          set yticks
+          0 lower:ymax/yinc 
+          end
+        endif
+  endif
+Note
+Note   Enter the number of subgroups.  This will be the number of tick marks 
+Note   across the X-axis.  
+Note   
+set data;
+file 'terminal';
+nobs 1.
+copy data xtick
+if xtick > 30
+   let xtang = 75
+   let xtsz = .75
+  else
+   let xtang = 0
+   let xtsz = .85 
+endif 
+if defs = 0
+  Note 
+  Note   Enter the label for the X-axis.    
+  Note  
+  set data;
+  file 'terminal';
+  format (a40);
+  nobs 1.
+  copy data xlabel
+  Note   
+  Note   Enter the label for the Y-axis.  
+  Note   
+  set data;
+  file 'terminal';
+  format (a40);
+  nobs 1.
+  copy data ylabel
+else
+  if ni = 1
+   let xlabel = "Observation Number"
+   let ylabel = "Individual Value"
+  else  
+   let xlabel = "Sample Number"
+   let ylabel = "Sample Mean"
+  endif
+endif  
+Note
+Note    Enter the title for the chart.  
+Note
+set data;
+file 'terminal';
+format (a80);
+nobs 1.
+copy data ttl
+copy upper data
+text data data
+copy data refup
+let refup1 = "UCL="
+kkcat refup1 refup refup
+copy lower data
+text data data
+copy data reflo
+let reflo1 = "LCL="
+kkcat reflo1 reflo reflo
+copy mu data
+text data data
+copy data refmu
+let refmu1 = "Mu="
+kkcat refmu1 refmu refmu
+erase data
+copy mu data
+let xmax = xtick + .25
+let ymax = ymax + yinc/2
+If ymin ne 0
+   let ymin = ymin - .5*yinc
+else
+endif
+Plot data*data;
+  wtitle 'Blank Control Chart';
+  Symbol;
+    Type 0;
+  Title ttl;
+  Axlab 1 xlabel;
+  Axlab 2 ylabel;
+  scale 1;
+    Maximum xmax;
+    Minimum .75;
+    Tick 1:xtick/1;
+    Tfont 1;
+    Tsize xtsz;
+    angle xtang;
+#    Length 0.015 ; 
+  scale 2;
+    Maximum ymax;
+    Minimum ymin;
+    labels yticks;
+    Tick yticks;
+      Tsize .75;
+      Length 0.01 ;
+  Data 0.13 0.87 0.13 0.87;
+  Grid 1;
+  Grid 2;
+  Reference 2 upper;
+    type 1;   
+    Color 2;
+    size 1.25; 
+    Labels refup;
+    Tcolor 16;
+    TSize .75; 
+    Offset .005 0;
+  Reference 2 mu;
+    type 1;
+    Color 4;
+    size 1.25;
+    Labels refmu;
+    Tcolor 16;
+    TSize .75; 
+    Offset .005 0;
+  Reference 2 lower;
+    type 1;
+    Color 2;
+    size 1.25; 
+    Labels reflo;
+    Tcolor 16;
+    TSize .75;
+  Offset .005 0;
+  footnote fn2;
+    TSize .6;
+    left;
+  #  Offset 0 .0225;
+  footnote fn4;
+    TSize .6;
+    left.
+Endmacro

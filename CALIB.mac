@@ -1,0 +1,165 @@
+macro
+
+#
+#     Name:  CALIB.MAC 
+#   Author:  Janice Derr
+#  Version:  Minitab 18
+#
+# This macro calculates the point and interval estimate for a new value of
+# X, the independent variable in a simple regression equation, given a new
+# determination of Y, the dependent variable.  This is referred to as the 
+# statistical calibration or inverse regression. 
+# 
+# Before you run the macro, enter your data into your worksheet.  Suppose 
+# your Y is in C1, X is in C2, and the new values of Y are in C3.  Choose 
+# Command Line Editor from the Edit menu.  Type the command
+#
+# %CALIB C1 C2 C3 
+#
+# Click the Submit Commands button. 
+#
+# The first argument after %CALIB is always used as Y, the second argument 
+# is always used as X, and the third argument is always used as the new 
+# values of Y.  If Y is in C5, X is in C3, and the new values of Y are in 
+# C9, you would type in the command  
+#
+# %CALIB C5 C3 C9 
+#
+# The default confidence level for the confidence interval is 95%, but you 
+# can change the confidence level by using the subcommand CLEVEL followed 
+# by the confidence level you wish to use.  To get a 99% confidence 
+# interval for the predicted values of X, run the following command
+#
+# %CALIB C5 C3 C9;
+#  CLEVEL 99.
+#
+###########################################################################
+#
+#  Neither Minitab, Inc. nor the author(s) of this MACRO makes any claim 
+#  of or offers any Warranty whatsoever with regard to the accuracy of 
+#  this MACRO or its suitability for use.  Minitab, Inc. and the author(s)
+#  of this MACRO each hereby disclaims any Warranty and/or liability with 
+#  respect thereto. 
+#
+###########################################################################
+# 
+#   Author:  Janice Derr 
+#            Department of Statistics 
+#            The Pennsylvania State University 
+#            University Park, PA  16802 
+#            (814) 865-3541 
+# 
+#   Reviewer:  Sandra Beder-Miller 
+#              American Scientific International, Inc. 
+#              c/o Environmental Protection Agency 
+#              6201 Congdon Boulevard 
+#              Duluth, MN  55804 
+# 
+#   Computer and Operation System: IBM-PC using MS-DOS 
+#   Minitab Release: 5.1 
+#   Date Submitted:  October 21, 1987  
+# 
+#   Reference:  Neter, John, Wasserman, William, and Kutner, 
+#               Michael H. (1985), Applied Linear  
+#               Statistical Models, Second Edition,  
+#               Homewood, Illinois:  Richard D. Irwin, Inc. 
+#
+################################################################
+#   Updated for Release 13 in August 2002 by Cathy Akritas  
+################################################################
+calib y x ynew;
+clevel clev.
+
+mcolumn y x xdev coeffs X_Hat ynew CI_Low CI_High s halfw Width corrfac cil Y_New ps
+mconstant ybar xbar ssqx cnt df mse b0 b1 clev tabt area pb1 sigb1 t
+default clev = .95
+
+mreset
+notitle
+brief 0
+noecho
+endmtitle
+ow 130
+
+mtitle "Statistical Calibration or Inverse Regression";
+  notitle.
+mean y ybar                                # ybar = mean of y
+mean x xbar                                # xbar = mean of x
+let xdev = x - xbar                        # xdev = deviations from the mean  
+let ssqx = ssq(xdev)                       # ssqx = Corrected Sums of Squares for x
+n y cnt                                    # cnt = number of non-missing observations
+let df = cnt - 2                           # df = degrees of freedom 
+brief 1
+regress;
+  response y;
+  continuous x; 
+  terms x;
+  Constant;
+  Nodefault;
+  TSimple;
+  Tmethod;
+  Tequation;
+  TAnova;
+  mse mse; 
+  coeff coeffs;
+  spvalue ps.
+brief 0
+let b0 = coeffs[1]                         # b0, the intercept 
+let b1 = coeffs[2]                         # b1, the slope 
+let pb1 = ps[2]
+
+#calculate the p-value for the slope
+#let sigb1 = sqrt(mse/ssqx)
+#let t = abso(b1/sigb1)
+#cdf t pb1;
+#  t df.
+#let pb1 = 2*(1-pb1)
+If pb1 > .25
+  brief 1
+  print "  From the regression analysis above, there is insufficient evidence to"
+  print "  reject Ho: slope = 0.  Therefore, the results of the inverse regression"  
+  print "  below could be misleading."
+  print "     "
+
+  brief 0
+
+endif
+
+let X_Hat = (ynew - b0)/b1                 # X_Hat, point estimates of X 
+if clev > 1 
+  let clev = clev/100
+endif
+let area = 1 - (1-clev)/2
+invcdf area tabt; 
+   t df.                                   # t-table value associated the area 
+let s = (mse/(b1**2))*(1 + 1/cnt + (((X_Hat - xbar)**2)/ssqx)) # variance of X_Hat 
+let halfw = tabt*sqrt(s)                   # half interval Width 
+let CI_Low = X_Hat - halfw                 # lower confidence bound 
+let CI_High = X_Hat + halfw                # upper confidence bound 
+let Width = 2*halfw                        # interval Width 
+let corrfac = (tabt**2)*mse/((b1**2)*ssqx) # correction factor < 0.1 ?
+let cil = clev * 100
+brief 2
+Print cil;
+  format (t5,'The ',f5.2,'% Confidence Interval(s) for the Predicted Values of X').
+
+copy ynew Y_New
+name Y_New 'New Y' CI_Low 'Lower Bound' X_Hat 'Predicted X' CI_High 'Upper Bound' Width 'Width'
+
+###text Y_New CI_Low X_Hat CI_High Width Y_New CI_Low X_Hat CI_High Width
+###stack ("YNew" "LowerBound" "Predicted X" "UpperBound" "Width") (Y_New CI_Low X_Hat CI_High Width) & 
+###      (Y_New CI_Low X_Hat CI_High Width)
+print Y_New CI_Low X_Hat CI_High Width
+  
+If corrfac < .1
+  print corrfac;
+  format (t5,'The correction factor is ',f13.7,', which is less than 0.1 indicating ',/,&
+  t5,'that the interval(s) above are probably a good approximations.').
+else
+  print "  "
+  print corrfac;
+  format (t5,'The correction factor is ',f13.7,', which is greater than 0.1 indicating ',/,&
+  t5,'that the interval(s) above are probably not a good approximations.').
+endif
+endmtitle
+ENDMACRO

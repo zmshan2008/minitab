@@ -1,0 +1,101 @@
+MACRO
+###########################################################################
+#
+#    Macro:  MEDABSDV.MAC 
+#   Author:  Dennis Williams -- Basell USA
+#  Version:  Minitab 18
+#     Date:  May 2008
+#
+#
+#  This macro calculates the Median Absolute Deviation of a dataset.  
+#
+#  To calculate the Median Absolute Deviation of the data in C2, go to 
+#  Edit > Command Line Editor, and type 
+#
+#  %MEDABSDV C2
+#
+#  Click on Submit Commands.
+#
+#  Formula:  MEDABSDV = bn*1.4826*MEDIAN{abs[C - MEDIAN(C)]}
+#
+#  where 1.4826 makes the expected value of MEDABSDV = STDEV(Normal population)
+#  and bn is a finite sample corrrection factor.
+#  
+#  Reference:  C. Croux and P. J. Rousseeuw, Time-efficient Algorithms for  
+#  Two Highly Robust Estimators of Scale, Computational Statistics, v. 2, 
+#  411-428, (1992).
+#
+#
+###########################################################################
+#
+#  Neither Minitab, Inc. nor the author(s) of this MACRO makes any claim 
+#  of or offers any Warranty whatsoever with regard to the accuracy of 
+#  this MACRO or its suitability for use.  Minitab, Inc. and the author(s)
+#  of this MACRO each hereby disclaims any Warranty and/or liability with 
+#  respect thereto. 
+#
+###########################################################################
+
+MEDABSDV C
+
+mconstant a b cname smplsize bn
+mcolumn C DV t x 
+
+mreset
+brief 0
+noecho
+notitle
+endmtitle
+
+LET smplsize = N(C)
+
+if smplsize le 1
+    brief 2
+    mtitle "Median Absolute Deviation Macro Error";
+      notitle.
+    Print "  ** Error **  The sample size must be greater than one"
+    Print "                    Macro Exiting"
+    endmtitle
+    exit
+endif
+
+LET a=MEDIAN(C)
+LET DV=ABS(C - a)
+IF smplsize EQ 2
+  LET bn=1.196
+ELSEIF smplsize EQ 3
+  LET bn=1.495
+ELSEIF smplsize EQ 4
+  LET bn=1.363
+ELSEIF smplsize EQ 5
+  LET bn=1.206
+ELSEIF smplsize EQ 6
+  LET bn=1.200
+ELSEIF smplsize EQ 7
+  LET bn=1.140
+ELSEIF smplsize EQ 8
+  LET bn=1.129
+ELSEIF smplsize EQ 9
+  LET bn=1.107
+ELSE
+  LET bn=smplsize/(smplsize - 0.8)
+ENDIF
+LET b=bn*1.482602*MEDIAN(DV)
+
+#create text output
+LET x(2)=b
+TEXT x x;
+  MAXWIDTH 25;
+  SIGNIFICANT 6.
+KKNAME cname C
+LET x(1)=cname
+LET t(1)="Observations in column: "
+LET t(2)="Estimated standard deviation = "
+CONCAT t x t
+mtitle "Estimated Normal StDev from Median Absolute Deviation";
+  notitle.
+brief 1
+print t;
+  format (5x,a80).
+endmtitle
+ENDMACRO

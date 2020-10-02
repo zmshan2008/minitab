@@ -1,0 +1,152 @@
+macro
+
+############################################################### 
+#
+#
+#     Name:  BOXPLOT3.MAC 
+#   Author:  Andy Haines
+#  Version:  Minitab 18
+#
+#  This macro creates a boxplot in which the outliers are based on the 3 
+#  times the interquartile range (instead of 1.5) and are optionally 
+#  stored in the worksheet.
+#
+#  For example, your data is in C1, and you want to store the outliers in 
+#  C6. Go to Edit > Command Line Editor and type
+#
+#  %BOXPLOT3 C1;
+#  STORE C6.
+#
+#  Click on Submit Commands.  
+#
+###########################################################################
+#
+#  Neither Minitab, Inc. nor the author(s) of this MACRO makes any claim 
+#  of or offers any Warranty whatsoever with regard to the accuracy of 
+#  this MACRO or its suitability for use.  Minitab, Inc. and the author(s)
+#  of this MACRO each hereby disclaims any Warranty and/or liability with 
+#  respect thereto. 
+#
+###########################################################################
+boxplot3 y;
+  store z.
+
+mcolumn y newy sorty xplot yplot ycuts hiout1 loout1 tmp1 tmp2 z 
+mcolumn mline xline xwhisk lowhisk hiwhisk xout
+mconstant medy loadjy hiadjy hiquary loquary 
+mconstant typelo typehi minplot maxplot namey namey2 namey3 n_out
+
+mreset
+noecho
+brief 0
+notitle
+endmtitle
+
+kkname namey y
+kkset namey2 "Boxplot of "
+kkcat namey2 namey namey3
+medi y medy
+hcut y ycuts
+copy ycuts minplot;
+  use 1.
+sort ycuts ycuts;
+  by ycuts;
+  desc ycuts.
+copy ycuts maxplot;
+  use 1.
+let maxplot = maxplot + .025*(maxplot-minplot)
+let minplot = minplot - .025*(maxplot-minplot)
+sort y sorty
+stats sorty;
+  qone tmp1;
+  qthree tmp2.
+copy tmp1 loquary
+copy tmp2 hiquary
+let loadjy = loquary - (3*(hiquary-loquary))
+let hiadjy = hiquary + (3*(hiquary-loquary))
+copy sorty newy;     #omits the low outliers
+  omit sorty = -1000000000000000000:loadjy.
+copy newy newy;      #omits the high outliers
+  omit newy = hiadjy:1000000000000000000.
+copy sorty loout1;   #stores the low outliers
+  use sorty = -1000000000000000000:loadjy.
+copy sorty hiout1;   #stores the high outliers
+  use sorty = hiadjy:1000000000000000000.
+dtype hiout1 typehi  
+dtype loout1 typelo
+
+mtitle "Boxplot with outliers based on 3*IQR";
+  notitle.
+
+if (typehi < 10)  or (typelo < 10)
+  stack loout1 hiout1 z
+  count Z n_out
+  set xout
+    (1.5)n_out
+  end
+elseif (typehi > 9) and (typelo > 9)
+  let n_out = 0  
+endif
+copy newy loadjy;
+  use 1.
+sort newy newy;
+  by newy;
+  desc newy.
+copy newy hiadjy;
+  use 1.
+copy 1.125 1.125 1.875 1.875 xplot
+copy loquary hiquary hiquary loquary yplot
+copy 1.5 1.5 xwhisk
+copy loquary loadjy lowhisk
+copy medy medy mline
+copy 1.125 1.875 xline
+copy hiquary hiadjy hiwhisk
+
+layout;
+  wtitle namey3;
+  graph;
+    type 0;
+  title namey3.
+  plot yplot*xplot;
+    symbol;
+      type 0;
+    scale 2;
+      mini minplot;
+      maxi maxplot;
+    poly xplot yplot;
+    line xline mline;
+    line xwhisk lowhisk;
+    line xwhisk hiwhisk;
+    scale 1;
+      mini .5;
+      maxi 2.5;
+    ldisplay 1 0 0 0; 
+    axlabel 2 namey;
+    axlabel 1 " ";
+    nodtitle;
+    data;
+      type 0;
+    footnote "Outliers are based on 3(Q3-Q1)".
+    
+  if n_out > 0
+    plot Z*xout;
+      scale 2;
+        mini minplot;
+        maxi maxplot;
+      scale 1;
+        mini .5;
+        maxi 2.5;
+      ldisplay 1 0 0 0; 
+      axlabel 2 namey;
+      axlabel 1 " ";
+      nodtitle;
+      symbol;
+        type 4;
+        color 16;
+      data;
+        type 0;
+      footnote "Outliers are based on 3(Q3-Q1)".
+  endif
+endlayout
+endmtitle
+endmacro

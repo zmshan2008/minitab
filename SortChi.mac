@@ -1,0 +1,139 @@
+macro
+#
+#         Macro: SortChi.mac
+#       Version: Minitab 18
+#
+#  Submitted by: Andrew M. Haines, 10/09/08
+#
+#  This macro performs a Chi-Square test of association for a single 
+#  response versus each specified factor, one factor at a time.  For each 
+#  factor, the p-value is calculated.  These values are then sorted from 
+#  the smallest to the largest p-value and displayed in a table.
+#
+#  Suppose the response data is in C3, and the factors are in columns C4,
+#  C6, and C9.  To run the macro, in Minitab choose Edit > Command Line 
+#  Editor and type
+#
+#  %sortchi C3 C4 C6 C9
+#
+#  Click Submit Commands.   
+#
+############################################################################
+#
+#  Neither Minitab, Inc. nor the author(s) of this MACRO makes any claim 
+#  of or offers any Warranty whatsoever with regard to the accuracy of 
+#  this MACRO or its suitability for use.  Minitab, Inc. and the author(s)
+#  of this MACRO each hereby disclaims any Warranty and/or liability with 
+#  respect thereto. 
+#
+############################################################################
+
+sortchi y x.1-x.n
+
+mcolumn y x.1-x.n
+mcolumn pred pval yval ycnt xval xcnt xyval1 xyval2 obscol expcol obsy obsx
+mcolumn contrib
+mconstant cnt pearson df pvalcon i kpred titl1 titl2 titl
+
+mreset
+noecho
+brief 0
+notitle
+endmtitle
+
+#
+# Error checking
+count y cnt
+
+stats;
+  by y;
+  gval yval;
+  n ycnt.
+
+if count(ycnt) < 2
+  call writerror 1
+endif
+
+#
+# Run each Chi-Square
+#
+
+do i = 1:n
+  # Predictor name
+  kkname kpred x.i
+  stack pred kpred pred
+
+  # P-value
+  stats;
+    by x.i;
+    gval xval;
+    n xcnt.
+
+  if count(xcnt) < 2
+    call writerror 1
+  endif
+
+  stats;
+    by y x.i;
+    gval xyval1 xyval2;
+    n obscol.
+
+  conv yval ycnt xyval1 obsy
+  conv xval xcnt xyval2 obsx
+  mult obsy obsx expcol
+  divide expcol cnt expcol
+
+  let contrib = ((obscol - expcol)**2) / expcol
+  sum contrib pearson
+
+  let df = (count(ycnt) - 1) * (count(xcnt) - 1)
+  
+  cdf pearson pvalcon;
+    chis df.
+
+  subt pvalcon 1 pvalcon
+
+  stack pval pvalcon pval
+enddo
+
+#
+# Sort
+#
+sort pred pval pred pval;
+  by pval.
+
+#let pval = round(pval,3)
+
+#
+# Display results
+#
+name pred "Factor"
+name pval "P-Value"
+
+let titl1 = "Sorted Chi-Square Test for "
+kkname titl2 y
+kkcat titl1 titl2 titl
+
+mtitle titl;
+  notitle.
+brief 2
+print pred pval
+endmtitle
+endmacro
+
+macro
+writerror x
+mconstant x
+
+if x = 1
+  Mtitle "Sorted Chi-Squared Test Macro Error";
+    notitle.  
+  brief 2
+  print "** ERROR ** Each column must contain 2 or more distinct values"
+  print "                     Macro Exiting"
+  print " "
+  endmtitle
+  exit
+endif
+
+endmacro

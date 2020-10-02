@@ -1,0 +1,159 @@
+gmacro
+ 
+#     Name:  Funnel.MAC
+#   Author:  Terry Ziemer 
+#  Version:  Minitab 18
+#
+###########################################################################
+#
+#  Neither Minitab, Inc. nor the author(s) of this MACRO makes any claim 
+#  of or offers any Warranty whatsoever with regard to the accuracy of 
+#  this MACRO or its suitability for use.  Minitab, Inc. and the author(s)
+#  of this MACRO each hereby disclaims any Warranty and/or liability with 
+#  respect thereto. 
+#
+###########################################################################
+Funnel
+
+mreset
+noecho
+brief 0
+endmtitle
+
+mtitle "Results from the Funnel Experiment";
+  notitle.  
+
+brief 2
+Print "********************************************************************"
+Print " Rule 1 of the Deming funnel experiment"                              
+Print " "                                                                       
+Print " The funnel remains fixed, aimed at the target. In this case the "
+Print " target is located at the coordinates (0,0). X1 and Y1 are the "    
+Print " coordinates of the point where the marble drops."                       
+Print "********************************************************************"  
+random 1000 c1 c11;                      # drop the marble 1000 times 
+  normal 0 1. 
+name c1 'Y1' c11 'X1' 
+gpause 4
+plot c1*c11; 
+   symbol; 
+      type 0; 
+   title 'Deming Funnel Experiment - Rule 1'; 
+   title 'Funnel Remains Fixed';
+   wtitle "Rule 1: Funnel Remains Fixed";
+   scale 1;
+     minimum -6; 
+     maximum 6;
+   scale 2;
+     minimum -6; 
+     maximum 6; 
+   lines c11 c1; 
+   type 1; 
+   color 5.
+
+print "********************************************************************"
+print "  Rule 2 of the Deming funnel experiment   "                           
+print "                                            "                          
+print "  Move the funnel from its previous position a distance equal to"
+print "  the current error (location of drop), in the opposite direction."
+print "********************************************************************"
+diff c1 c2 
+diff c11 c12 
+let c2[1] = c1[1] 
+let c12[1] = c11[1] 
+name c2 'Y2' c12 'X2' 
+plot c2*c12; 
+   symbol; 
+      type 0; 
+   title 'Deming Funnel Experiment - Rule 2'; 
+   title 'Funnel Moved the Distance of the Current'; 
+   title 'Error in the Opposite Direction';
+   wtitle "Rule 2: Funnel Moved in Opposite Direction";
+   scale 1;
+     minimum -6; 
+     maximum 6;
+   scale 2;
+     minimum -6; 
+     maximum 6;
+   lines c12 c2; 
+      type 1; 
+      color 5. 
+#
+brief 2
+print "********************************************************************"
+print "  Rule 3 of the Deming funnel experiment    (Bow Tie Effect)   "       
+print "                                                               "       
+print "  Move the funnel to a position that is exactly opposite the point"
+print "  where the last marble dropped, relative to the target.        "   
+print "*********************************************************************"
+# 
+set c99 
+  500(1 -1)
+end 
+let c3 = (pars(c1*c99))*c99 
+let c13 = (pars(c11*c99))*c99 
+name c3 'Y3' c13 'X3' 
+plot c3*c13; 
+   symbol; 
+      type 0; 
+   title 'Deming Funnel Experiment - Rule 3'; 
+   title 'Bow Tie Effect'; 
+   wtitle "Rule 3: Bow Tie Effect";
+   lines c13 c3; 
+      type 1; 
+      color 5. 
+#
+brief 2
+print "********************************************************************"
+print "  Rule 4 of the Deming funnel experiment     (Random Walk)   "
+print "           "                                                           
+print "  Move the funnel to the position where the last marble dropped     "
+print "********************************************************************"  
+
+let c4 = pars(c1)
+let c14 = pars(c11) 
+name c4 'Y4' c14 'X4' 
+#
+plot c4*c14; 
+   symbol; 
+      type 0; 
+   title 'Deming Funnel Experiment - Rule 4'; 
+   title 'Random Walk'; 
+   wtitle "Rule 4: Random Walk";
+   lines c14 c4; 
+      type 1; 
+      color 5.
+stack c1 - c4 c5 
+stack c11 - c14 c15 
+let k97 = mini(c5) - .5 
+let k96 = maxi(c5) + .5 
+let k95 = mini(c15) - .5 
+let k94 = maxi(c15) + .5
+brief 2
+plot c4*c14;
+   scale 1;
+     maximum k94; 
+     minimum k95;
+   scale 2;
+     maximum k96;
+     minimum k97;
+   symbol; 
+      type 0; 
+   title 'Deming Funnel Experiment'; 
+   title 'Comparison of Amounts of Variability'; 
+   wtitle "Comparison of Amounts of Variability";
+   axlabel 1 'X';
+   axlabel 2 'Y';
+   lines c14 c4; 
+      color 2; 
+   lines c13 c3; 
+      color 5; 
+   lines c12 c2; 
+      color 4; 
+   lines c11 c1; 
+      color 7; 
+   footnote 'Red : Rule 4    Lt. Blue: Rule 3'; 
+   footnote 'Blue: Rule 2    Yellow  : Rule 1'.
+endmtitle
+erase c5 c15 k94 - k97 
+endmacro

@@ -1,0 +1,147 @@
+macro
+#
+#    Macro:  STANDARD.MAC
+#   Author:  Cathy Akritas
+#  Version:  Minitab 18
+#
+#  This macro creates a standardized control chart for the fraction of 
+#  non-conforming units.  
+#
+#  Suppose C1 contains the number of defects (or defectives) and C2 is the 
+#  total number of items that were tested.  Go to Edit > Command Line 
+#  Editor and type
+#
+#    %Standard C1 C2
+#
+#  Click on Submit Commands.  
+#
+#  You can use a column of dates to label the x axis.  Suppose your dates 
+#  are in C3.  Go to Edit > Command Line Editor and type 
+#
+#    %Standard C1 C2;
+#    Labels C3.
+#
+#  Click on Submit Commands.
+#
+#  Reference:  D.C. Montgomery (2001). Introduction to Statistical Quality 
+#              Control, 4th edition, John Wiley & Sons.
+#
+###########################################################################
+#
+#  Neither Minitab, Inc. nor the author(s) of this MACRO makes any claim 
+#  of or offers any Warranty whatsoever with regard to the accuracy of 
+#  this MACRO or its suitability for use.  Minitab, Inc. and the author(s)
+#  of this MACRO each hereby disclaims any Warranty and/or liability with 
+#  respect thereto. 
+#
+###########################################################################
+
+standard Di ni;
+  label date.
+
+mcolumn  Di ni pi Zi date sigmai out
+mconstant pbar ymax ymin cnt k1 cnt1 cnt2 title xname
+
+mreset 
+brief 0
+noecho
+notitle
+endmtitle
+
+let cnt1 = count(Di)
+let cnt2 = count(ni)
+
+if cnt1 <> cnt2
+ mtitle "Standardized Control Chart for Fraction of Non-Conforming";
+    notitle.
+  brief 1 
+  print "   ** Error **  Input columns must have the same number of rows"
+  print "                     Macro Exiting"  
+  endmtitle
+  exit
+endif
+if label = 1
+  count date cnt
+  if cnt <> cnt1
+   mtitle "Standardized Control Chart for Fraction of Non-Conforming";
+      notitle.
+    brief 1 
+    print "   ** Error **  All input columns must have the same number of rows"
+    print "                     Macro Exiting"  
+    endmtitle
+    exit
+  endif
+endif
+
+If ni = 0 
+ mtitle "Standardized Control Chart for Fraction of Non-Conforming";
+    notitle.
+  brief 1 
+  print "   ** Error **  Sample size must be greater than 0"
+  print "                      Macro Exiting"
+  endmtitle
+  exit
+endif
+
+let pi = Di/ni
+
+if label = 0
+  count pi cnt
+  set date 
+    1:cnt
+  end
+  let k1 = "Sample Number"  
+else 
+  let k1 = "Date"
+endif
+
+let pbar = sum(Di)/sum(ni)
+
+let sigmai = sqrt(pbar*(1-pbar)/ni)
+let Zi = (pi-pbar)/sigmai
+let out = (Zi > 3 or Zi< -3)
+Code (0) 1 (1) 2 ('*') 1 out out
+let ymax = maxi(zi)
+rmax ymax 3 ymax
+let ymax = ymax*1.1
+let ymin = mini(zi)
+rmin ymin -3 ymin
+let ymin = ymin + ymin*.1
+
+kkname xname Di
+let title = concat("Standardized Control for Fraction of Defects for ", xname)
+
+ mtitle "Standardized Control Chart for Fraction of Non-Conforming";
+    notitle.
+Tsplot Zi;
+  wtitle "Standardized Control Chart for Fraction Non-conforming";
+  title title;
+  Index;
+  stamp date;
+  axlabel 1 k1;
+  scale 2; 
+    maxi ymax;
+    mini ymin;
+  Connect;
+    Type 1;
+    Color 1;
+    Size 1;
+  Symbol;
+    Type 6;
+    Color out;
+    Size 1;
+  Reference 2 3;
+    Type 1;
+    Color 2;
+    Size 1;
+  Reference 2 -3;
+    Type 1;
+    Color 2;
+    Size 1;
+  Reference 2 0;
+    Type 1;
+    Color 3;
+    Size 1;
+  Nodtitle.
+endmtitle
+endmacro

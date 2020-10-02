@@ -1,0 +1,218 @@
+macro
+#
+#         Macro: LJCHART.MAC
+#  Submitted by: Kelly Aubuchon, May 2009
+#       Version: Minitab 18
+#
+#       Purpose: This macro generates a Levey-Jennings control chart.  
+#  Optional subcommand allows you to specify a stamp column for the x-axis.
+#
+#  Suppose C1 contains the data for the control chart. The mean is 0, and 
+#  the standard deviation is 1. Choose Edit > Command Line Editor and type 
+#  
+#  %ljchart C1 0 1
+#
+#  Click on Submit Commands.  
+#
+#  There is an optional subcommand to label the x-axis using a stamp 
+#  column.  Suppose the stamp column is in C2. To use the subcommand, 
+#  choose Edit > Command Line Editor and type 
+#
+#  %ljchart C1 0 1;
+#    stamp C2.  
+#
+#  Click on Submit Commands.
+#
+###########################################################################
+#
+#  Neither Minitab, Inc. nor the author(s) of this MACRO makes any claim 
+#  of or offers any Warranty whatsoever with regard to the accuracy of 
+#  this MACRO or its suitability for use.  Minitab, Inc. and the author(s) 
+#  of this MACRO each hereby disclaims any Warranty and/or liability with 
+#  respect thereto. 
+#
+###########################################################################
+
+ljchart data xbar sd;
+stamp scol.
+
+mcolumns data scol test ptype
+mconstant xbar sd vartype ljtitle dnam s2 s3 ll2 ll3 ul2 ul3
+mconstant l2 l3 u2 u3 xb llab2 llab3 ulab2 ulab3 xblab dcount scount
+
+mreset
+brief 0
+noecho
+notitle
+endmtitle
+
+dtype data vartype
+
+if vartype=1 OR vartype=2
+
+  if sd>0
+
+    kkset ljtitle "Levey-Jennings Plot of "
+    kkname dnam data
+    kkcat ljtitle dnam ljtitle
+
+    multiply 2 sd s2
+    multiply 3 sd s3
+
+    subtract s2 xbar ll2
+    subtract s3 xbar ll3
+
+    add xbar s2 ul2
+    add xbar s3 ul3
+
+    let l2 = text(ll2)
+    let l3 = text(ll3)
+    let u2 = text(ul2)
+    let u3 = text(ul3)
+    let xb = text(xbar)
+        
+    kkset llab2 "-2SL=" llab3 "-3SL=" ulab2 "2SL=" ulab3 "3SL=" xblab "xbar="
+    kkcat llab2 l2 llab2
+    kkcat llab3 l3 llab3
+    kkcat ulab2 u2 ulab2
+    kkcat ulab3 u3 ulab3
+    kkcat xblab xb xblab
+    
+    let test = if(data lt ul2 AND data gt ll2, 1, data lt ll3 OR data gt ul3, 2, 43)
+
+    Code (1) 6 (2 43) 12 test ptype
+
+    if stamp = 1
+
+      count data dcount
+      count scol scount
+
+      if dcount = scount
+
+        Tsplot data;
+          Index;
+          Connect;
+            Type 1;
+            Color 1;
+            Size 2;
+          Symbol;
+            color test;
+            type ptype;
+            size 1;
+          Stamp scol;
+          Reference 2 ll3;
+            Type 1;
+            Color 2;
+            Size 2;
+            MODEL 1;
+            Label llab3;
+            Tcolor 16;
+          Reference 2 ll2;
+            Type 1;
+            Color 43;
+            Size 2;
+            MODEL 1;
+            Label llab2;
+            Tcolor 16;
+          Reference 2 ul2;
+            Type 1;
+            Color 43;
+            Size 2;
+            MODEL 1;
+            Label ulab2;
+            Tcolor 16;
+          Reference 2 ul3;
+            Type 1;
+            Color 2;
+            Size 2;
+            MODEL 1;
+            Label ulab3;
+            TColor 16;
+          Reference 2 xbar;
+            Type 1;
+            Color 3;
+            Size 2;
+            MODEL 1;
+            Label xblab;
+            Tcolor 16;
+          Title ljtitle;
+          wtitle ljtitle;
+          NoDTitle.
+
+      else
+	mtitle "Levey-Jennings Control Chart Macro Error";
+	  notitle.
+        brief 1
+        Print "  ** Error **  The stamp column must be the same length as the data column."
+        Print "                    Macro Exiting"
+	endmtitle
+      endif
+
+    else
+
+      Tsplot data;
+        Index;
+        Connect;
+          Type 1;
+          Color 1;
+          Size 2;
+        Symbol;
+          color test;
+          type ptype;
+          size 1;
+        Reference 2 ll3;
+          Type 1;
+          Color 2;
+          Size 2;
+          MODEL 1;
+          Label llab3;
+        Reference 2 ll2;
+          Type 1;
+          Color 43;
+          Size 2;
+          MODEL 1;
+          Label llab2;
+        Reference 2 ul2;
+          Type 1;
+          Color 43;
+          Size 2;
+          MODEL 1;
+          Label ulab2;
+        Reference 2 ul3;
+          Type 1;
+          Color 2;
+          Size 2;
+          MODEL 1;
+          Label ulab3;
+        Reference 2 xbar;
+          Type 1;
+          Color 3;
+          Size 2;
+          MODEL 1;
+          Label xblab;
+        Title ljtitle;
+        wtitle ljtitle;
+        NoDTitle.
+
+    endif
+
+  else
+    mtitle "Levey-Jennings Control Chart Macro Error";
+      notitle.
+    brief 1
+    Print "  ** Error **  The standard deviation must be greater than 0."
+    print "                    Macro Exiting"
+    endmtitle
+
+  endif
+
+else
+  mtitle "Levey-Jennings Control Chart Macro Error";
+    notitle. 
+  brief 1
+  Print "  ** Error **  A numeric data column must be specified."
+  Print "                    Macro Exiting."
+  endmtitle
+endif
+
+endmacro

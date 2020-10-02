@@ -1,0 +1,467 @@
+macro
+#
+#     Name:  QCSummary.mac
+#   Author:  Andrew M. Haines   
+#     Date:  4/19/02
+#  Version:  Minitab 18
+#
+#  This macro uses summary data to make an Xbar chart and either an R 
+#  chart or an S chart.  The R/S choice is determined by whether ranges or 
+#  standard deviations are entered.
+#
+#  These three subcommands are required: MEAN, SIZE and either STDEV or 
+#  RANGE.  
+#
+#  The arguments to MEAN, SIZE, STDEV and RANGE can either be a column 
+#  containing one value for each subgroup or a single constant that should 
+#  be used for all subgroups.
+#
+#  Suppose C1 contains the means, C2 contains the subgroup sizes and C3 contains 
+#  the ranges for each subgroup.  The worksheet might look something like.
+#
+#   C1       C2      C3
+#  Means   Sizes   Ranges
+#   12.1       5     1.25
+#   11.9       4     1.20  
+#   12.2       6     1.22
+#   12.0       4     1.32 
+#   11.8       2     1.21
+#
+#  Go to Edit > Command Line Editor and type 
+#
+#  %qcsummary;
+#    mean C1;
+#    range C3;
+#    size C2.
+#
+#  Click on Submit Commands.  Or if all of your subgroups are have 
+#  observations then you would enter
+#
+#  %qcsummary;
+#    mean C1;
+#    range C3;
+#    size 5.
+#
+#  Legal values for TEST are 1, 2, 3, 4, 5, 6, 7, 8.
+#
+#  An historical grouping column can be entered using the HPROCESS 
+#  subcommand.
+#
+###########################################################################
+#
+#  Neither Minitab, Inc. nor the author(s) of this MACRO makes any claim 
+#  of or offers any Warranty whatsoever with regard to the accuracy of 
+#  this MACRO or its suitability for use.  Minitab, Inc. and the author(s)
+#  of this MACRO each hereby disclaims any Warranty and/or liability with 
+#  respect thereto. 
+#
+###########################################################################
+
+qcsummary;
+  mean mufree;
+  stdev sdfree;
+  range rnfree;
+  size szfree;
+  test t.1-t.tnum;
+  hprocess hp.
+
+mcolumn mu sd rn sz fakex faken tmpx tmpn tmpxx tmp testxbar testrsch hp 
+mcolumn hpcol tmphp
+mconstant mucnt sdcnt szcnt i valn valx valsd ttl ttl1 wttl wttl1 vn hpcnt
+mconstant obsxx expxx ttl2 wttl2 ttl3 wttl3 mutype sdtype sztype nn t.1-t.tnum 
+mconstant szdtype hpname hpval by
+mfree mufree sdfree rnfree szfree
+
+mreset
+noecho
+brief 0
+notitle
+endmtitle
+
+#
+# General error checking.
+#
+
+if (stdev) and (range)
+  # Can only specify either standard deviations or ranges.
+  call writerror 1
+endif
+
+if mean + stdev + range + size <> 3
+  # Need to enter means, sizes and ranges / standard deviations.
+  call writerror 2
+endif
+
+#
+# Convert from free variables to columns.
+#
+
+# Determine type (column, constant or matrix) of the arguments.
+mtype mufree mutype
+mtype szfree sztype
+
+if (stdev)
+  mtype sdfree sdtype
+else
+  mtype rnfree sdtype
+endif
+
+# Find number of subgroups.
+if (hprocess)
+  n hp hpcnt
+  copy hpcnt nn
+elseif (mutype <> 2) and (sdtype <> 2) and (sztype <> 2)
+  copy 1 nn
+elseif mutype = 2
+  copy mufree tmp
+  n tmp nn
+elseif sdtype = 2
+  if (stdev)
+    copy sdfree tmp
+  else
+    copy rnfree tmp
+  endif
+  n tmp nn
+elseif sztype = 2
+  copy szfree tmp
+  n tmp nn
+endif
+
+# Setup temporary column of means.
+if mutype = 2
+  copy mufree mu
+elseif mutype = 1
+  set mu
+    (mufree)nn
+end
+else
+  # Can't enter a matrix of means.
+  call writerror 5
+endif
+
+# Setup temporary column of ranges / standard deviations.
+if sdtype = 2
+  if (stdev)
+    copy sdfree sd
+  else
+    copy rnfree rn
+  endif
+elseif sdtype = 1
+  if (stdev)
+    set sd
+      (sdfree)nn
+end
+  else
+    set rn
+      (rnfree)nn
+end
+  endif
+else
+  # Can't enter a matrix of ranges / standard deviations.
+  call writerror 5
+endif
+
+if (stdev)
+  if min(sd) < 0
+    # Standard deviations must be positive.
+    call writerror 8
+  endif
+else
+  if min(rn) < 0
+    # Ranges must be positive.
+    call writerror 8
+  endif
+endif
+
+# Setup temporary column of subgroup sizes.
+if sztype = 2
+  copy szfree sz
+elseif sztype = 1
+  set sz
+    (szfree)nn
+end
+else
+  # Can't enter a matrix of subgroup sizes.
+  call writerror 5
+endif
+
+if min(sz) < 1
+  # Subgroup sizes must be greater than 0.
+  call writerror 7
+endif
+
+dtype sz szdtype
+
+if szdtype <> 2
+  # Subgroup sizes must be integers.
+  call writerror 7
+endif
+
+# Must have same number of subgroups in all columns.
+n mu mucnt
+n sz szcnt
+
+if stdev
+  n sd sdcnt
+else
+  n rn sdcnt
+endif
+
+if (mucnt <> szcnt) or (mucnt <> sdcnt)
+  # All input columns must be the same length.
+  call writerror 3
+endif
+
+if (hprocess)
+  if hpcnt <> mucnt
+    # All input columns must be the same length.
+    call writerror 3
+  endif
+endif
+
+#
+# Create fake data
+#
+do i = 1:mucnt
+  # The basic idea here is to "expand" the means column by using the subgroup
+  # sizes as frequencies and then adjust two of values in the subgroup (I'm
+  # arbitrarily using the first and last) to match the range / standard
+  # deviation.
+  copy sz valn;
+    use i.
+
+  set tmpn
+    (i)valn
+end
+
+  stack faken tmpn faken
+
+  if range
+    copy rn valsd;
+      use i.
+  else
+    copy sd valsd;
+      use i.
+  endif
+
+  if (valn < 2) and (valsd <> 0)
+    # For subgroup of size 1, the range / standard deviation must be 0.
+    call writerror 4
+  endif
+
+  copy mu valx;
+    use i.
+
+  set tmpx
+    (valx)valn
+end
+
+  if range
+    # For ranges, subtract half the range from the first value and add half the
+    # range to the last value.
+    let tmpx(1) = tmpx(1) - (valsd/2)
+    let tmpx(valn) = tmpx(valn) + (valsd/2)
+  else
+    # For standard deviations, adjust the first and last values so that we
+    # achieve the required sum of squares (since this is the only non-fixed
+    # value in the standard deviation equation - all other values have been
+    # entered for us).
+    let expxx = ((valn - 1) * valsd) + (valn * valx * valx)
+
+    mult tmpx tmpx tmpxx
+
+    sum tmpxx obsxx
+
+    let tmpx(1) = tmpx(1) - sqrt(valsd * (expxx - obsxx) / 2)
+    let tmpx(valn) = tmpx(valn) + sqrt(valsd * (expxx - obsxx) / 2)
+
+  endif
+
+  stack fakex tmpx fakex
+
+  # Create historical grouping column.
+  if hprocess
+    copy hp hpval;
+      use i.
+  else
+    copy 1 hpval
+  endif
+
+  set tmphp
+    (hpval)valn
+end
+
+  stack hpcol tmphp hpcol
+enddo
+
+if test
+  do i = 1:tnum
+    if (t.i <> 1) & (t.i<>2) & (t.i <> 3) & (t.i <> 4) & (t.i <> 5) & (t.i <> 6) & (t.i <> 7) & (t.i <> 8)
+      # Only integers from 1 through 8 are valid tests.
+      call writerror 6
+    endif
+  enddo
+
+  # Tests to run on the Xbar chart.
+  copy t.1-t.tnum testxbar
+
+  # Tests to run on the R/S chart.
+  if min(testxbar) < 5
+    copy testxbar testrsch;
+      omit testxbar 5:8.
+  else
+    copy 0 testrsch
+  endif
+else
+  copy 0 testxbar
+  copy 0 testrsch
+endif
+mtitle "Control Chart from Summary Data";
+  notitle.
+#
+# Make control charts.
+#
+
+# Construct title and window title.
+let ttl1 = "X-bar Chart for "
+let wttl1 = "X-bar Chart: "
+
+if range
+  let ttl2 = "R Chart for "
+  let wttl2 = "R Chart: "
+else
+  let ttl2 = "S Chart for "
+  let wttl2 = "S Chart: "
+endif
+
+if mutype = 2
+  kkname vn mufree
+else
+  let vn = "Data"
+endif
+
+kkcat ttl1 vn ttl
+kkcat wttl1 vn wttl
+
+kkcat ttl2 vn ttl3
+kkcat wttl2 vn wttl3
+
+if hprocess
+  kkname hpname hp
+  let by = " by "
+  kkcat ttl by ttl1
+  kkcat wttl by wttl1
+  kkcat ttl3 by ttl2
+  kkcat wttl3 by wttl2
+  kkcat ttl1 hpname ttl
+  kkcat wttl1 hpname wttl
+  kkcat ttl2 hpname ttl3
+  kkcat wttl2 hpname wttl3
+endif
+
+if stdev
+  xbar fakex faken;
+    sbar;
+    title ttl;
+    wtitle wttl;
+    test testxbar;
+    hproc hpcol.
+
+  schart fakex faken;
+    sbar;
+    title ttl3;
+    wtitle wttl3;
+    test testrsch;
+    hproc hpcol.
+else
+  xbar fakex faken;
+    rbar;
+    title ttl;
+    wtitle wttl;
+    test testxbar;
+    hproc hpcol.
+
+  rchart fakex faken;
+    rbar;
+    title ttl3;
+    wtitle wttl3;
+    test testrsch;
+    hproc hpcol.
+endif
+endmtitle
+endmacro
+
+
+macro
+
+writerror x
+mconstant x
+
+brief 2
+if x = 1
+  mtitle "Control Chart from Summary Data Macro Error";
+    notitle.
+  brief 2.
+  print "Enter either STDEV or RANGE"
+  print "Macro Exiting"
+  endmtitle
+  exit
+elseif x = 2  
+  mtitle "Control Chart from Summary Data Macro Error";
+    notitle.
+  brief 2.
+  print "Must enter MEAN, SIZE and either STDEV or RANGE"
+  print "Macro Exiting"
+  endmtitle
+  exit
+elseif x = 3
+  mtitle "Control Chart from Summary Data Macro Error";
+    notitle.
+  brief 2.
+  print "All input columns must be the same length"
+  print "Macro Exiting"
+  endmtitle
+  exit
+elseif x = 4
+  mtitle "Control Chart from Summary Data Macro Error";
+    notitle.
+  brief 2.
+  print "For subgroups of size 1, stdev or range must = 0"
+  print "Macro Exiting"
+  endmtitle
+  exit
+elseif x = 5
+  mtitle "Control Chart from Summary Data Macro Error";
+    notitle.
+  brief 2.
+  print "Subcommand arguments must be either columns or constants"
+  print "Macro Exiting"
+  endmtitle
+  exit
+elseif x = 6
+  mtitle "Control Chart from Summary Data Macro Error";
+    notitle.
+  brief 2.
+  print "Illegal test number - must be integers from 1 to 8"
+  print "Macro Exiting"
+  endmtitle
+  exit
+elseif x = 7
+  mtitle "Control Chart from Summary Data Macro Error";
+    notitle.
+  brief 2.
+  print "SIZE values must be positive integers"
+  print "Macro Exiting"
+  endmtitle
+  exit
+elseif x = 8
+  mtitle "Control Chart from Summary Data Macro Error";
+    notitle.
+  brief 2.
+  print "STDEV and RANGE values must be non-negative"
+  print "Macro Exiting"
+  endmtitle
+  exit
+endif
+
+endmacro

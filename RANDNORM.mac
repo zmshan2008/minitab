@@ -1,0 +1,43 @@
+macro
+
+############################################################### 
+#
+#
+#     Name:  RANDNORM.MAC 
+#  Version:  Minitab 18
+#
+#  This macro generates a number from a normal distribution with the mean 
+#  from one column and standard deviation from another column, row by row. 
+#
+#  For example, if the means are in C1, the standard deviations are in C2, 
+#  and you want the results stored in C3, choose Edit > Command Line Editor 
+#  and type 
+#
+#  %RANDNORM c1 c2 c3
+#  
+#  Click on Submit commdands.
+#
+###########################################################################
+#
+#  Neither Minitab, Inc. nor the author(s) of this MACRO makes any claim 
+#  of or offers any Warranty whatsoever with regard to the accuracy of 
+#  this MACRO or its suitability for use.  Minitab, Inc. and the author(s)
+#  of this MACRO each hereby disclaims any Warranty and/or liability with 
+#  respect thereto. 
+#
+###########################################################################
+randnorm a b c
+
+mcolumn a b c d
+mconstant n k r m s
+
+let n = count (a)
+
+do k=1:n
+  let m = a(k)
+  let s = b(k)
+  random 1 d;
+  normal m s.
+  let c(k) = d(1)
+enddo
+endmacro

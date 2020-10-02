@@ -1,0 +1,101 @@
+macro
+#
+#         Macro: WINSOR.MAC
+#  Submitted by: Kelly Aubuchon, June 2009
+# 
+#       Purpose: This macro calculates the Winsorized mean and variance. 
+#  Optional subcommands allow you to specify the amount of Winsorizing (by 
+#  default c=0.2) and store the results.
+#
+#  Suppose C1 contains the data. Go to Edit > Command Line Editor and type 
+#  
+#  %winsor C1
+#
+#  Click on Submit Commands.  
+#
+#  There are optional subcommands to specify the amount of Winsorizing and 
+#  store the results. Suppose you would like to remove and replace the 
+#  upper and lower 10% of the data and you would also like to store the 
+#  mean in C2 and the variance in C3.  To use the subcommands, go to 
+#  Edit > Command Line Editor and type 
+#
+#  %winsor C1;
+#    c 0.1;
+#    store C2 C3.  
+#
+#  Click on Submit Commands.
+#
+###########################################################################
+#
+#  Neither Minitab, Inc. nor the author(s) of this MACRO makes any claim 
+#  of or offers any Warranty whatsoever with regard to the accuracy of 
+#  this MACRO or its suitability for use.  Minitab, Inc. and the author(s) 
+#  of this MACRO each hereby disclaims any Warranty and/or liability with 
+#  respect thereto. 
+#
+###########################################################################
+
+winsor data;
+  c prop;
+  store wmean wvar.
+
+mcolumns data windata temp sw2 mw dvar wmean wvar
+mconstants prop n cn k yl yh dname wtitle pnote
+
+default prop=0.2
+mreset
+brief 0
+
+if prop > 0 and prop < 0.5
+  sort data windata
+  count windata n
+  multiply prop n cn
+  let cn = floor(cn)
+  subtract cn n k
+  add k 1 k
+  copy windata windata;
+    exclude;
+    rows 1:cn k:n.
+  minimum windata yl
+  maximum windata yh
+  set temp
+    1(yl)cn
+  end
+  stack windata temp windata
+  set temp
+    1(yh)cn
+  end
+  stack windata temp windata
+  stats windata;
+    mean mw;
+    variance sw2.
+  if store = 1
+    name wmean "WMean" wvar "WVariance"
+    copy mw wmean
+    copy sw2 wvar
+  endif
+  text mw mw
+  stack "Mean" mw mw
+  text sw2 sw2
+  stack "Variance" sw2 sw2
+  kkname dname data
+  stack "Variable" dname dvar
+  kkset wtitle "Winsorized Statistics: " 
+  kkcat wtitle dname wtitle
+  let prop = text(prop)
+  kkset pnote "Winsorization performed using a proportion of "
+  kkcat pnote prop pnote
+  brief 1
+  mtitle wtitle
+  notitle
+  write dvar mw sw2
+  notitle
+  write pnote
+else
+  brief 1
+  note
+  note * Error * Invalid proportion.
+  note           Please specify a proportion such that 0 < c < 0.5.
+  note
+endif
+endmacro

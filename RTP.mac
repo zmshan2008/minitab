@@ -1,0 +1,120 @@
+gmacro
+
+#    Name:  RTP.MAC
+# Version:  Minitab 18
+
+# This macro is written by a member or members of the Minitab Users' Group 
+# and is sponsored by Minitab, Inc.  It first appeared in the Minitab 
+#  Users' Group Newsletter Number 1, March 1982. 
+# 
+#     	RIDGE TRACE PLOT 
+# 
+#     SUBMITTED BY:	BERT GUNTER    DECEMBER, 1981 
+#     DAVID SARNOFF RESEARCH CENTER 
+#     RCA LABS 
+#     PRINCETON, N.J. 08540 
+# 
+###########################################################################
+#
+#  Neither Minitab, Inc. nor the author(s) of this MACRO makes any claim 
+#  of or offers any Warranty whatsoever with regard to the accuracy of 
+#  this MACRO or its suitability for use.  Minitab, Inc. and the author(s)
+#  of this MACRO each hereby disclaims any Warranty and/or liability with 
+#  respect thereto. 
+#
+###########################################################################
+RTP
+
+brief 2
+echo
+notitle
+endmtitle
+
+Mtitle "Ridge Trace Plot";
+  notitle.
+Print "             INPUT REQUIRED "
+Print " "
+Print "     'Y'--COLUMN OF RESPONSES "
+Print "     'K'--COLUMN OF K VALUES FOR RIDGE TRACE "
+Print "      K1--NUMBER OF PREDICTOR COLUMNS (EXCLUDING CONSTANT TERM) "
+Print "  M1--X-MATRIX OF PREDICTOR VARIABLES CENTERED AND SCALED "
+Print "  "
+Print "    'Y' AND X-MATRIX ARE CENTERED AND SCALED SO EACH VARIABLE HAS "
+Print "    ZERO MEAN AND UNIT STANDARD DEVIATION. "
+# 
+# 
+#                                 SCRATCH STORAGE USED 
+# 
+#     COLUMNS: C45 C46 C47 
+#     CONSTANTS: K2 K3  K5 K6 
+#     MATRICES: M2 M3 M4 M5 
+# 
+#                                 OUTPUT RESULTS 
+# 
+#     'COEFF'--COLUMN OF REGRESSION COEFFICIENTS FOR RIDGE TRACE 
+#     'KVALUE'--COLUMN OF K'S FOR RIDGE TRACE 
+#     'PREDICT'--PREDICTOR VARIABLE NUMBERS TO LABEL TRACE 
+#     'SUMSQ'--COLUMN OF RESIDUAL SS 
+# 
+# 
+# 
+# 
+Print " "
+Print "                                DESCRIPTION "
+Print "    THIS PROGRAM PRODUCES A RIDGE TRACE PLOT AND A PLOT OF RSS VS K "
+Print "    FOR DATA IN 'Y' AND PREDICTORS FORMED INTO THE M1 MATRIX. "
+Print "    NOTE:  M1 AND 'Y' SHOULD BE IN CORRELATION FORM."
+Print "    THESE PLOTS ARE USEFUL DATA ANALYTIC TOOLS FOR RIDGE REGRESSION.  "
+Print "    A GOOD SUMMARY OF THIS TECHNIQUE IS CONTAINED IN: D.W. "
+Print "    MARQUARDT & R.D.SNEE, 'RIDGE REGRESSION IN PRACTICE' THE" 
+Print "    AMERICAN STATISTICIAN, VOL. 29, NO. 1. SEE ALSO THE REFERENCES "
+Print "    CONTAINED THEREIN. THE PROGRAM ASSUMES THERE ARE NO MISSING DATA" 
+Print "  " 
+
+brief 0
+COPY 'Y' M4 
+TRANS M1 M2 
+MULT M2 M1 M5
+MULT M2 M4 M2
+SET C46  #ONE, TWO,....K-ONE 
+1:K1 
+END 
+CODE (1:K1) 1 C46 C45    #COLUMN OF ONES 
+LET K2=0 
+COUNT 'K' K3 
+erase c97 - c100
+name c100 'KVALUE' c99 'COEFF' c98 'PREDICT' c97 'SUMSQ' 
+LET 'KVALUE'[1]=1 
+LET 'COEFF'[1]=1 
+LET 'PREDICT'[1]=1 
+LET 'SUMSQ'[1]=1 
+DO k2 = 1:K3  #EXECUTE LOOP FOR EACH VALUE OF K 
+  LET C47=C45*'K'[K2] 
+  STACK 'KVALUE' C47 'KVALUE' 
+  DIAG C47 M3 
+  ADD M3 M5 M3    #ADD K TO X-PRIME X DIAGONAL 
+  INVERT M3 M3 
+  MULT M3 M2 M4 
+  COPY M4 C47 
+  MULT M1 M4 M4 
+  STACK 'COEFF' C47 'COEFF' 
+  STACK 'PREDICT' C46 'PREDICT' 
+  COPY M4 C47 
+  SUBT C47 'Y' C47 
+  SSQ C47 K5 
+  STACK 'SUMSQ' K5 'SUMSQ' 
+ENDDO 
+LET K6=COUNT('SUMSQ') 
+DELETE K6 'SUMSQ' 
+LET K6=COUNT('PREDICT') 
+DELETE K6 'PREDICT' 
+LET K6=COUNT('COEFF') 
+DELETE K6 'COEFF' 
+LET K6=COUNT('KVALUE') 
+DELETE K6 'KVALUE' 
+PLOT 'COEFF'*'KVALUE'; 
+   symbol; 
+     type 'PREDICT'. 
+PLOT 'SUMSQ'*'K' 
+endmtitle
+endmacro

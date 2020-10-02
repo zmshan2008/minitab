@@ -1,0 +1,288 @@
+macro
+
+#########################################################################
+#
+#  Name:        BLANDALT.MAC
+#  Version:     Minitab 18
+#  Written by:  Eli Walters on 6/25/2009
+#
+#
+#  This macro produces a Bland-Altman plot of paired data.  The
+#  differences and averages of the data pairs are plotted with the center 
+#  line and the limits of agreement (LOA).  Plotted points beyond the LOA 
+#  are flagged in red.
+#
+#  The data pairs must be stored in two columns of the worksheet.  Suppose 
+#  you measure a particular characteristic on multiple items via two 
+#  different methods (System 1 and System 2), which yields the following 
+#  data in C1 and C2 of the worksheet:
+#
+#  System 1	System 2
+#  --------     --------
+#
+#   72.0750	  86.804
+#   80.0278	 101.666
+#   80.9296	 101.522
+#   91.6236	  91.261
+#   89.5408	  94.422
+#   97.8183	  88.713
+#
+#  To generate the Bland-Altman plot, go to Edit > Command Line 
+#  Editor, and type:
+#
+#  %blandalt C1 C2
+#
+#  The optional subcommand STIND allows you to store an indicator column 
+#  which flags the data pairs that lead to points beyond the LOA.  To 
+#  store the indicator column in C3, go to Edit > Command Line Editor and 
+#  type:
+#
+#  %blandalt C1 C2;
+#  stind C3.
+#
+#  The optional subcommands HMEAN and HSTDEV allow you to specify, 
+#  respectively, an historical mean and/or standard deviation for the 
+#  differences, which determine the centerline and LOA.  These
+#  subcommands can be used together or independently.  To specify an 
+#  historical mean of -5, go to Edit > Command Line Editor and type:
+#
+#  %blandalt C1 C2;
+#  hmean -5.
+#
+#  Finally, three additional (optional) subcommands allow you to store the 
+#  mean of the differences (STMN), the standard deviation of the 
+#  differences (STSD), and/or the LOA (STLA).  One storage column is 
+#  required for each of the subcommands, and the subcommands can be used 
+#  together or independently.  To store the mean and standard deviation of 
+#  the differences in C4 and C5, go to Edit > Command Line Editor and type:
+#
+#  %blandalt C1 C2;
+#  stmn C4;
+#  stsd C5.
+#
+##########################################################################
+#
+#  Neither Minitab, Inc. nor the author(s) of this MACRO makes any claim 
+#  of or offers any Warranty whatsoever with regard to the accuracy of 
+#  this MACRO or its suitability for use.  Minitab, Inc. and the author(s)
+#  of this MACRO each hereby disclaims any Warranty and/or liability with 
+#  respect thereto. 
+#
+##########################################################################
+
+blandalt x y;
+stind pchk;
+hmean hmn;
+hstdev hsd;
+stmn a;
+stsd c;
+stla b.
+
+mcolumn x y diffs avgs txt1 txt2 txt3 txt4 pchk rws id a b c
+mconstant cline sd lla ula k1 k2 k3 clinet sdt ulat llat ulab llab clab 
+mconstant xtyp ytyp lenx leny hmn hsd len lenx2 leny2 k5 t1 t2
+
+mreset
+brief 0
+noecho
+notitle
+endmtitle
+
+##########
+# error checking
+##########
+name t1 "Error"
+
+dtype x xtyp
+dtype y ytyp
+
+if (xtyp <> 1 and xtyp<>2) or (ytyp<>1 and ytyp<>2)
+  mtitle "Bland Altman Plot Macro Error";
+    notitle. 
+  brief 2
+  print " ** Error ** Input columns must be numeric"
+  print "                  Macro Exiting"
+  endmtitle
+  exit
+endif
+
+count x lenx
+count y leny
+
+if lenx<2 or leny<2
+  mtitle "Bland Altman Plot Macro Error";
+    notitle. 
+  brief 2
+  print " ** Error ** At least two data points must be provided"
+  print "                 Macro Exiting"
+  endmtitle
+  exit
+endif
+
+if lenx <> leny
+  mtitle "Bland Altman Plot Macro Error";
+    notitle.
+  brief 2
+  print " ** Error ** Input columns must have the same number of rows"
+  print "                  Macro Exiting"
+  endmtitle
+  exit
+endif
+
+##########
+# calculations
+##########
+
+let diffs=x-y
+let avgs=(x+y)/2
+
+name diffs "Differences"
+name avgs "Averages"
+
+if hmean = 0
+  mean diffs cline
+else
+  let cline=hmn
+endif
+
+if hstdev=0
+  stdev diffs sd
+else
+  let sd=hsd
+endif
+
+kkset k1 "Mean = "
+copy cline txt1
+fnumeric txt1;
+fixed 2.
+text txt1 txt1
+copy txt1 clinet
+kkcat k1 clinet clab
+
+name clinet "Est. mean of the differences:"
+
+copy sd txt4
+fnumeric txt4;
+fixed 2.
+text txt4 txt4
+copy txt4 sdt
+
+name sdt "Est. stdev of the differences:"
+
+let lla=cline-(1.96*sd)
+let ula=cline+(1.96*sd)
+
+if stmn=1
+  let a=cline
+  name a "B-A Mean"
+endif
+
+if stsd=1
+  let c=sd
+  name c "B-A StDev"
+endif
+
+if stla=1
+  let b[1]=lla
+  let b[2]=ula
+  name b "B-A Limits of Agreement"
+endif
+
+kkset k2 "ULA = "
+copy ula txt2
+fnumeric txt2;
+fixed 2.
+text txt2 txt2
+copy txt2 ulat
+kkcat k2 ulat ulab
+
+kkset k3 "LLA = "
+copy lla txt3
+fnumeric txt3;
+fixed 2.
+text txt3 txt3
+copy txt3 llat
+kkcat k3 llat llab
+
+let pchk=if(diffs gt ula or diffs lt lla,1,0)
+name pchk "B-A Indicator"
+
+name rws "Rows"
+
+n x lenx2
+n y leny2
+
+if lenx2 lt leny2
+  let len=lenx2
+else
+  let len=leny2
+endif
+
+if sum(pchk)=len
+  let k5=2
+else
+  let k5=1
+endif
+
+mtitle "Bland-Altman Plot";
+  notitle.
+Plot diffs * avgs;
+  NoLegend;
+  NoJitter;
+  Connect;
+    Type 0;
+    Size 1;
+  Symbol pchk;
+    Type 6 6;
+    Color k5 2;
+    Size 1 1;
+  Reference 2 cline;
+    Type 1;
+    Color 50;
+    Size 2;
+    MODEL 1;
+    Label clab;
+    Tcolor 16;
+  Reference 2 ula;
+    Type 1;
+    Color 2;
+    Size 3;
+    MODEL 1;
+    Label ulab;
+    Tcolor 16;
+  Reference 2 lla;
+    Type 1;
+    Color 2;
+    Size 3;
+    MODEL 1;
+    Label llab;
+    Tcolor 16;
+  Title "Bland-Altman Plot";
+  WTitle "Bland-Altman Plot";
+  Footnote;
+    FPanel;
+  NoDTitle.
+
+brief 2
+
+print clinet sdt
+
+brief 0
+
+if sum(pchk)>0
+  set id
+  1(1:lenx)1
+  end
+
+  copy id rws;
+  include;
+  where "pchk = 1".
+  name t1 "Note"
+  brief 2
+  let t1 = "The following plotted points are beyond the limits of agreement:"
+  print t1 
+  print rws;
+    format (I6).
+endif
+endmtitle
+endmacro

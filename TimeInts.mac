@@ -1,0 +1,162 @@
+macro
+
+###########################################################################
+#
+#       Macro: Timeints.mac
+#     Version: Minitab 18  
+#
+#  Written by: Mindy Tomlinson    February 2009
+#              Modified from a macro written by CBA September 2005
+#
+#  This macro displays the frequency of date/time observations that fall 
+#  into the user-specified time intervals. For example, say you have 
+#  failure times in a column and wish to know how many failures occurred 
+#  within 15 minute intervals. The macro also prints the minimum and 
+#  maximum time in the column.
+#
+#  Suppose your raw date/time data is in C1 and you wish to determine how 
+#  many observations occurred in 15 minute intervals, starting at 8:00 AM 
+#  on 1/1/2009 and ending at 4:00 PM of the same day. As well, say you 
+#  wish to store the intervals in column C3 and the frequencies of 
+#  observations in those intervals in column C4.  To run this macro, 
+#  choose Edit > Command Line Editor. Type the command,
+#
+#  %Timeints C1  "1/1/2009 8:00 AM"  "1/1/2009 3:00 PM"  15   C3 C4
+#
+#  and click Submit Commands.
+#
+#  The output in columns C3 and C4 will look something like
+#
+#  C3 						|  C4
+#  -------------------------------------------------------
+#  Interval					|  Frequency
+#  -------------------------------------------------------
+#  1/1/2009 08:00 AM to 1/1/2009 08:15 AM	|  3
+#  1/1/2009 08:15 AM to 1/1/2009 08:30 AM	|  5
+#  1/1/2009 08:30 AM to 1/1/2009 08:45 AM	|  10
+#  1/1/2009 08:45 AM to 1/1/2009 09:00 AM	|  2
+#	....					|  ....
+#
+#  The first argument after the %Timeints command has to be the column 
+#  containing the date/time data. The second argument has to the starting 
+#  time of the first interval, enclosed in double-quotes. The third 
+#  argument has to be the end time of the last interval, enclosed in 
+#  double-quotes. The fourth argument has to be the length of the 
+#  intervals, in minutes. The fifth argument has to be the column you wish 
+#  to store the intervals in  and the sixth argument has to the column you 
+#  wish to store the frequencies.
+# 
+#  NOTE: The format specified in the start and end times ("1/1/2009 08:00 
+#  am") does not need to match your data. However, the intervals that will 
+#  be stored in C3 will reflect the format you specified.
+#
+#  NOTE: Just as with Minitab's histogram algorithm, observations that 
+#  fall on interval boundaries are placed into the interval to the right, 
+#  with one exception:  observations on the boundary of the interval that 
+#  is farthest to the right are placed in the last interval.
+#
+###########################################################################
+#
+#  Neither Minitab, Inc. nor the author(s) of this MACRO makes any claim 
+#  of or offers any Warranty whatsoever with regard to the accuracy of 
+#  this MACRO or its suitability for use.  Minitab, Inc. and the author(s)
+#  of this MACRO each hereby disclaims any Warranty and/or liability with 
+#  respect thereto. 
+#
+###########################################################################
+
+Timeints x tstart tend inc intrvls freqs
+
+mcolumn x intrvls freqs bins intlo inthi tmin tmax
+mconstant tstart tend inc cnt i j binlo binhi intfreq 
+
+mreset
+brief 0
+noecho
+notitle
+endmtitle
+
+########
+#  Find the minimum and maximum time, then print them
+########
+let tmin = when(min(x))
+let tmax = when(max(x))
+name tmin "Minimum Time" tmax "Maximum Time"
+mtitle "Frequency of Date/Time Data";
+  notitle.
+brief 2
+print tmin;
+  format ('The minimum date/time = ', DT30mm/dd/yyyy hh:mm:ss am/pm).
+print tmax;
+   format ('The minimum date/time = ', DT30mm/dd/yyyy hh:mm:ss am/pm).
+Print "     The specified time intervals are saved in the worksheet"
+endmtitle
+########
+#  Turn off all session window output while macro runs
+########
+brief 0 
+
+########
+#  Create a column of interval endpoints, starting with "tstart" and ending with 
+#  "tend", in increments of "inc"
+########
+dset bins;
+  dstart tstart;
+  dend tend;
+  minute inc;
+  rvalue 1; 
+  rlist 1.
+
+########
+#  Count the total number of intervals needed to iterate through 
+########
+n bins cnt
+subtract 2 cnt cnt
+
+########
+#  For each iteration in the following DO-loop, count the frequency 
+#  of observations in "x" greater than or equal to the low endpoint, 
+#  "binlo", and less than the high endpoint, "binhi"
+########
+erase freqs
+do i=1:cnt
+  add 1 i j
+  copy bins binlo;
+    include;
+      rows i.
+  copy bins binhi;
+    include;
+      rows j.
+  let intfreq = sum((x >= binlo) and (x < binhi))
+  stack freqs intfreq freqs
+enddo
+
+########
+#  For the last interval, count the frequency of observations in "x" greater 
+#  than or equal to the low endpoint and less than or equal to the high endpoint.
+########
+add 1 i i
+add 1 j j
+  copy bins binlo;
+    include;
+      rows i.
+  copy bins binhi;
+    include;
+      rows j.
+  let intfreq = sum((x >= binlo) and (x <= binhi))
+  stack freqs intfreq freqs
+
+########
+#  Create the "Intervals" column 
+########
+copy bins intlo;
+  exclude;
+    rows j.
+copy bins inthi;
+  exclude;
+    rows 1.
+text intlo intlo
+text inthi inthi
+let intrvls = concatenate(intlo," to ",inthi)
+name intrvls "Time Interval" freqs "Frequencies"
+endmacro

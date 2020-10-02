@@ -1,0 +1,56 @@
+macro
+
+###########################################################################
+#
+#
+#    Macro:  BINOPROB.MAC
+#   Author:  Joel Smith  July 2005
+#  Version:  Minitab 18
+#
+#  This macro generates the cumulative probability of the binomial 
+#  distribution with a number of trials from one column, a number of 
+#  successes from a second column, and a given probability of success,  
+#  row by row.
+#
+#  For example, if the number of trials are in C1, the number of success 
+#  are in C2, the probability of success is 0.95, and you want the results 
+#  stored in C3, choose Edit > Command Line Editor and type
+# 
+#  %BINOPROB c1 c2 0.95 c3
+#  
+#  Click on Submit Commands.
+#
+###########################################################################
+#
+#  Neither Minitab, Inc. nor the author(s) of this MACRO makes any claim 
+#  of or offers any Warranty whatsoever with regard to the accuracy of 
+#  this MACRO or its suitability for use.  Minitab, Inc. and the author(s)
+#  of this MACRO each hereby disclaims any Warranty and/or liability with 
+#  respect thereto. 
+#
+###########################################################################
+binoprob a b m c
+
+mcolumn a b c d
+mconstant  k m n p q r s
+
+mreset
+noecho
+brief 0
+notitle
+endmtitle
+
+mtitle "The Binomial Probabilites are Stored in the Worksheet";
+  Notitle.
+endmtitle
+
+let n = count(a)
+
+do k=1:n
+  let p = a[k]
+  let q = b[k]
+  CDF q r;
+  binomial p m.
+  let c[k]=r
+enddo
+endmacro

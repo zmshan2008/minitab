@@ -1,0 +1,303 @@
+macro
+
+###################################################################### 
+#
+#    Name:  SMOOTH.MAC 
+#  Author:  Andy Haines
+#  Verion:  Minitab 18
+#
+#  This macro replaces the missing values in a column using a smoothing 
+#  technique that handles missing values by assuming a linear relationship.
+#
+#  This macro replaces missing values in a column of data with the
+#  "average" of the data around them. One missing value is replaced by the 
+#  average of the observations before and after it. Multiple missing 
+#  values are replaced by "steps" between the known values.  
+#
+#  For example, you want to smooth the data in C1, and store the original 
+#  data in C2.  Go to Edit > Command Line Editor, type :
+#
+#  %SMOOTH C1 C2
+#
+#  Click on Submit Commands.
+#
+###########################################################################
+#
+#  Neither Minitab, Inc. nor the author(s) of this MACRO makes any claim 
+#  of or offers any Warranty whatsoever with regard to the accuracy of 
+#  this MACRO or its suitability for use.  Minitab, Inc. and the author(s)
+#  of this MACRO each hereby disclaims any Warranty and/or liability with 
+#  respect thereto. 
+#
+###########################################################################
+
+smooth a g
+mcolumn a b c d f g
+mconstant n i j k i2 m p o q r s diff z y n2 diff2 i3 n3 z3 n31
+mconstant x1 x2 x n4
+
+brief 0
+noecho
+notitle
+endmtitle
+
+copy a g
+let n = count(a)
+let y = 0
+
+if a[1] <> '*' and a[n] <> '*'
+
+  do i = 2:n
+    let o = 0
+    if a[i] = '*' 
+      let m = 0
+      let j = 2
+      do k = i:n
+        let i2 = k + 1
+        if a[i2] = '*' and m = 0
+          let j = j + 1
+        else
+          let m = m + 1
+        endif
+      enddo
+      let o = j - 1
+      let q = i - 1
+      let r = i + o
+      let diff = a[r] - a[q]
+      do p = 1:o
+        let s = q + p
+        let a[s] = a[q] + (diff*(p/j))
+      enddo
+    endif
+    if o <> 0  
+      let i = i + o
+    endif
+  enddo
+
+elseif a[1] = '*' and a[n] <> '*'
+
+  let b[1] = 1
+  
+  do z = 2:n
+    if a[z] = '*' and y = 0
+      let b[z] = 1
+    else
+      let y = 1
+      let b[z] = 0
+    endif
+  enddo
+
+  copy a c;
+    use b = 0.
+
+  copy a d;
+    use b = 1.
+
+  let n2 = count(d)
+  let n = count(c)
+
+  do i = 1:n
+    let o = 0
+    if c[i] = '*' 
+      let m = 0
+      let j = 2
+      do k = i:n
+        let i2 = k + 1
+        if c[i2] = '*' and m = 0
+          let j = j + 1
+        else
+          let m = m + 1
+        endif
+      enddo
+      let o = j - 1
+      let q = i - 1
+      let r = i + o
+      let diff = c[r] - c[q]
+      do p = 1:o
+        let s = q + p
+        let c[s] = c[q] + (diff*(p/j))
+      enddo
+    endif
+    if o <> 0  
+      let i = i + o
+    endif
+  enddo
+
+  let diff2 = c[2] - c[1]
+
+  do i = 1:n2
+    let i3 = n2 - i + 1
+    let d[i3] = c[1] - (i*diff2)
+  enddo
+
+  stack d c a
+
+elseif a(1) <> '*' and a(n) = '*'
+
+  let b(n) = 1
+  let n3 = n - 1
+
+  do z = 1:n3
+    let z3 = n - z
+    if a[z3] = '*' and y = 0
+      let b[z3] = 1
+    else
+      let y = 1
+      let b[z3] = 0
+    endif
+  enddo
+
+  copy a c;
+    use b = 0.
+
+  copy a d;
+    use b = 1.
+
+  let n2 = count(d)
+  let n = count(c)
+
+  do i = 1:n
+    let o = 0
+    if c[i] = '*' 
+      let m = 0
+      let j = 2
+      do k = i:n
+        let i2 = k + 1
+        if c[i2] = '*' and m = 0
+          let j = j + 1
+        else
+          let m = m + 1
+        endif
+      enddo
+      let o = j - 1
+      let q = i - 1
+      let r = i + o
+      let diff = c[r] - c[q]
+      do p = 1:o
+        let s = q + p
+        let c[s] = c[q] + (diff*(p/j))
+      enddo
+    endif
+    if o <> 0  
+      let i = i + o
+    endif
+  enddo
+
+  let n31 = n - 1
+
+  let diff2 = c[n] - c[n31]
+
+  do i = 1:n2
+    let d[i] = c[n] + (i*diff2)
+  enddo
+
+  stack c d a
+
+else
+
+  let b[1] = 1
+
+  do z = 2:n
+    if a[z] = '*' and y = 0
+      let b[z] = 1
+    else
+      let y = 1
+      let b[z] = 0
+    endif
+  enddo
+
+  let y = 0
+
+  let b[n] = 2
+  let n3 = n - 1
+
+  do z = 1:n3
+    let z3 = n - z
+    if a[z3] = '*' and y = 0
+      let b[z3] = 2
+    elseif b[z3] <> 1
+      let y = 1
+      let b[z3] = 0
+    endif
+  enddo
+
+  copy a c;
+    use b = 0.
+
+  copy a d;
+    use b = 1.
+
+  copy a f;
+    use b = 2.
+
+  let x2 = count(f)
+
+  if x2 <> n
+
+    let x1 = count(c)
+
+    if x1 > 1
+
+      let n = count(c)
+      let n2 = count(d)
+
+      do i = 1:n
+        let o = 0
+        if c[i] = '*' 
+          let m = 0
+          let j = 2
+          do k = i:n
+            let i2 = k + 1
+            if c[i2] = '*' and m = 0
+              let j = j + 1
+            else
+              let m = m + 1
+            endif
+          enddo
+          let o = j - 1
+          let q = i - 1
+          let r = i + o
+          let diff = c[r] - c[q]
+          do p = 1:o
+            let s = q + p
+            let c[s] = c[q] + (diff*(p/j))
+          enddo
+        endif
+        if o <> 0  
+          let i = i + o
+        endif
+      enddo
+
+      let diff2 = c[2] - c[1]
+      do i = 1:n2
+        let i3 = n2 - i + 1
+        let d[i3] = c[1] - (i*diff2)
+      enddo
+
+      let n31 = n - 1
+      let diff2 = c[n] - c[n31]
+
+      let n4 = count(f)
+
+      do i = 1:n4
+        let f[i] = c[n] + (i*diff2)
+      enddo
+
+      stack d c a
+      stack a f a
+
+    else
+
+      let n = count(a)
+      let x = c[1]
+      do i = 1:n
+        let a[i] = x
+      enddo
+
+    endif
+
+  endif
+
+endif
+
+endmacro

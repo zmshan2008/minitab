@@ -1,0 +1,347 @@
+macro
+
+###########################################################################
+#
+#        Name:  STXTAB.MAC
+#     Version:  Minitab 18
+#  Written by:  Eli Walters, 6/9/2009
+#
+#  This macro stores a cross tabulation of two data columns into the 
+#  worksheet.  
+#  
+#  Suppose you want to determine which production team is producing the 
+#  different defect types.  Nine parts are randomly selected from a pile 
+#  of defective parts.  The team information is in C1 and defect type is 
+#  in C2.
+#
+#   Team    Defect   
+#   ----    ------ 
+#   A       Bubble    
+#   A       Scratch   
+#   A       Dent      
+#   A       Bubble    
+#   B       Dent      
+#   B       Puncture  
+#   C       Bubble    
+#   C       Puncture  
+#   C       Scratch   
+#
+#  To store the cross tabulation of the two columns in the worksheet, you 
+#  must use the STORE subcommand (required) and specify enough columns for 
+#  the full cross tabulation.  The number of columns necessary is two more 
+#  than the number of distinct values in the second data column you list 
+#  as an input.  (This is the variable that will determine the columns of 
+#  the cross tabulation.)  In the example above, Defect will determine the 
+#  columns of the cross tabulation and has four distinct values, so 6 
+#  columns are required to store the cross tabulation.  To store the cross 
+#  tabulation of C1 and C2 in C11-C16 of the worksheet, go to Edit > 
+#  Command Line Editor and type the following:
+#
+#  %stxtab C1 C2;
+#   store C11 - C16.
+#
+#  Click on Submit Commands.  The table that is stored in the worksheet is 
+#  below.
+#
+#           Bubble  Dent  Puncture  Scratch  All
+#  A        2       1     0         1        4
+#  B        0       1     1         0        2
+#  C        1       0     1         1        3
+#  All      3       2     2         2        9
+#
+#
+#  The distinct values of Team were used to define the rows, and the
+#  distinct values of Defect were used to define the columns of the table.
+#
+#  There are also optional subcommands available to store the observed 
+#  counts (STOBS), the expected counts (STEXP), and the chi-square 
+#  contribution (STCHI) for each cell.  Each of these subcommands requires 
+#  one input column.  You may use these subcommands together or 
+#  independently.  If you use at least one of them, you must also use the 
+#  subcommand STLABS (which requires two input columns) to store the cell 
+#  labels.  If, for example, you want to store the observed and expected 
+#  counts in C6 and C7, respectively, and the cell labels in C4 and C5,
+#  go to Edit > Command Line Editor and type
+#  
+#  %stxtab C1 C2;
+#  store C11 - c16;
+#  stlab C4 C5;
+#  stobs C6;
+#  stexp C7.
+#  
+#  Click on Submit Commands.  
+# 
+#  There are also 2 optional subcommands for creating graphs: GCNTS 
+#  displays a bar chart of observed and expected counts and GCHI displays 
+#  a bar chart of contribution to chi-square.  These can be used together 
+#  or independently.  The commands would look something like
+#  
+#  %stxtab C1 c2;     or   %stxtab C1 C2;      or   %stxtab C1 C2;
+#   store c11-c16;          store c11 - C16;         store C11 - C16;
+#   gcnts.                  gchi.                    gcnts; 
+#                                                    gchi. 
+#
+###########################################################################
+#  
+#  Neither Minitab, Inc. nor the author(s) of this MACRO makes any claim 
+#  of or offers any Warranty whatsoever with regard to the accuracy of 
+#  this MACRO or its suitability for use.  Minitab, Inc. and the author(s)
+#  of this MACRO each hereby disclaims any Warranty and/or liability with 
+#  respect thereto. 
+#
+###########################################################################
+
+stxtab x y;
+store z.1-z.n;
+stlab xvals yvals;
+stobs obvals;
+stexp expvals;
+stchi ctchi;
+gcnts;
+gchi;
+grp m.
+
+mcolumn x y z.1-z.n v.1-v.m xval xcnt yval ycnt xtmp ytmp m1 m2 n1 n2 Ntot 
+mcolumn numOR denOR ckcol ckcol2 xvals yvals obvals
+mcolumn xmarg ymarg expvals ctchi clabs cnts cntlabs nstore expvals2 x2 y2
+mconstant j k m n xlen ylen ylen2 i k1 xlen2 q chk ckval f chi lenx leny nexp nexp2 k5
+
+default m = 100
+
+mreset
+noecho
+brief 0
+notitle
+endmtitle
+
+count x lenx
+count y leny
+
+copy x x2
+text x2 x2
+copy y y2
+text y2 y2
+
+tally x2;
+store xval xcnt.
+
+tally y2;
+store yval ycnt.
+
+text xval xval
+text yval yval
+
+count xval xlen
+count yval ylen
+
+if lenx <> leny
+  call writerror 1
+endif
+
+if (xlen < 2) or (ylen < 2)
+  call writerror 4
+endif
+
+if store=0
+  call writerror 3
+endif
+
+if (stlab=0 and stobs=1) or (stlab=0 and stexp=1) or (stlab=0 and stchi=1)
+  call writerror 5
+endif
+
+let m=ylen+1
+let nexp=m+1
+
+copy nexp nstore
+text nstore nstore
+let nstore=left(nstore,1)
+copy nstore nexp2
+
+kkset k5 " The required number of storage columns is "
+kkcat k5 nexp2 k5
+Name k5 "   Error   "
+
+if n<>nexp
+  Mtitle "Storing a Cross Tabulation Macro Error";
+  notitle.
+  brief 2
+  print k5
+  print "          Macro Exiting"  
+  endmtitle
+  exit
+endif
+
+brief 0
+
+let ckcol=concat(x2,y2)
+
+mtitle "Storing a Two-Way Table";
+  notitle.  
+
+let f=1
+
+do j=1:xlen
+
+  do k=1:ylen
+
+    let chk=concat(xval[j],yval[k])
+    let ckcol2=if(ckcol=chk,1,0)
+    let ckval=sum(ckcol2)
+
+    let xvals[f]=xval[j]
+    let yvals[f]=yval[k]
+
+    if ckval <> 0
+
+      copy x2 y2 xtmp ytmp;
+      include;
+      where "x2=xval[j] and y2=yval[k]".
+
+      let obvals[f]=count(xtmp)
+      let v.k[j]=count(xtmp)
+
+    else
+
+      let obvals[f]=0
+      let v.k[j]=0
+
+    endif
+
+    let f=f+1
+
+  enddo
+
+enddo
+
+name xvals "Row Labels"
+name yvals "Column Labels"
+
+name obvals "Obs"
+rsum v.1-v.ylen v.m
+copy v.m xmarg
+
+let xlen2=xlen+1
+let ylen2=ylen+1
+
+do q=1:ylen2
+
+  let ymarg[q]=sum(v.q)
+  let v.q[xlen2]=sum(v.q)
+  
+enddo
+
+let f=1
+
+do j=1:xlen
+
+  do k=1:ylen
+
+    let expvals2[f]=xmarg[j]*ymarg[k]
+    let f=f+1
+
+  enddo
+
+enddo
+
+let expvals=expvals2/ymarg[ylen2]
+name expvals "Exp"
+
+erase z.1-z.n
+
+let z.1=xval
+let z.1[xlen2]="All"
+
+let ylen2=ylen+1
+
+do i=2:ylen2
+
+  let k1=yval[i-1]
+  name z.i k1
+
+enddo
+
+name z.n "All"
+
+let ctchi=((obvals-expvals)**2)/expvals
+let chi=sum(ctchi)
+
+name ctchi "Contribution to Chi-Square"
+
+let clabs=concat(xvals,"-",yvals)
+name clabs "Cell Labels"
+
+if gchi=1
+chart ( ctchi ) * clabs;
+summarized;
+decreasing;
+bar.
+endif
+
+Stack obvals expvals cnts;
+  subscripts cntlabs;
+  UseNames.
+stack clabs clabs clabs
+
+name cntlabs "Count Type"
+name cnts "Counts"
+
+copy v.1-v.m z.2-z.n
+
+brief 2
+title
+
+XTABS x y; 
+  Layout 1 1;
+  Counts;
+  expected;
+  sres;
+  xres;
+  ChiSquare.
+
+notitle
+
+if gcnts=1
+Chart cnts * clabs;
+  AxLabel 1;
+    LShow  1;
+  TShow 1;
+  Group cntlabs;
+  Summarized;
+  Legend;
+    Section 1;
+  Bar cntlabs;
+  Title;
+  Footnote;
+    FPanel;
+  NoDTitle.
+endif
+endmtitle
+endmacro
+
+###########################
+###########################
+
+macro
+writerror x
+mconstant x
+
+Mtitle "Storing a Two-Way Table Macro Error";
+  notitle.
+brief 2
+
+if x = 1
+  print " ** Error ** Input columns have different lengths"
+elseif x = 2
+  print " ** Error ** Incorrect number of storage columns for cross tabulation"
+elseif x = 3
+  print " ** Error ** You must specify storage columns for the cross tabulation via the STORE subcommand"
+elseif x = 4
+  print " ** Error ** Each column must contain at least two distinct values"
+elseif x = 5
+  print " ** Error ** Use STLAB subcommand to specify 2 storage columns for the levels of the variables"
+endif
+  print "                  Macro Exiting"  
+endmtitle
+exit
+endmacro

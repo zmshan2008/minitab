@@ -1,0 +1,327 @@
+macro
+#**************************************************************************
+#
+# Macro:             TWOZTEST.MAC
+# Version:           Minitab 18
+# Date:              06/01/09
+# Author:            Annie Molhoek and Eduardo Santiago
+#
+#**************************************************************************
+#
+#  This macro performs a 2-sample Z test on either stacked or unstacked
+#  data stored in the active worksheet. The main difference between this 
+#  test and a two sample t test is that the population standard deviations 
+#  are assumed to be known for the 2-sample Z test.  
+#
+#  The term "unstacked data" indicates that the samples are stored in 
+#  separate columns.  That is, if one sample is stored in C1 and the other 
+#  sample is stored in C2, then the data is unstacked.  If both samples 
+#  are stored in C1 and the sample indicator is stored in C2, then the 
+#  data is stacked.  
+#
+#  The null hypothesis for this test is Ho: mu1 - mu2 = d, where the 
+#  default value of d is 0.  The default alternative hypothesis is 
+#  Ha: mu1 - mu2 not equal d.  The default value of alpha is .05.  
+#
+#  Suppose the data is unstacked and stored in C1 and C2 where the 
+#  standard deviation for the first sample is 1 and for the second sample
+#  is 1.25.  To run the macro using all the default setting, choose Edit > 
+#  Command Line Editor and type the following command:
+#
+#  %twoztest C1 C2 1 1.25
+#
+#  Click on Submit Commands.  The output includes descriptive statistics
+#  for each sample and a 95% confidence interval for '(Xbar1 - Xbar2) - 0'.  
+#  The Z statistic and corresponding p-value are displayed as well. 
+#
+#  Optional subcommands allow you to change the defaults.  Suppose you 
+#  want to use Ha: mu1 - mu2 > 10 as the alternative hypothesis and change 
+#  the value of alpha to 0.10.  Choose Edit > Command Line Editor and type 
+#  the following commands: 
+# 
+#  %twoztest C1 C2 1 1.25;
+#   diff 10;
+#   alt 1;
+#   alpha 0.1.
+#
+#  Click on Submit Commands.  The output includes descriptive statistics 
+#  for each sample and a 90% confidence bound for '(Xbar1 - Xbar2) - 10'. 
+#  The Z statistic and corresponding p-value are displayed as well. 
+#
+#  To perform a lower-tailed test, use the subcommand ALT subcommand with 
+#  -1 as the argument.  The commands will look something like 
+#  
+#  %twoztest C1 C2 1 1.25;
+#  alt -1.
+#  
+#**************************************************************************
+#
+#  Neither Minitab, Inc. nor the author(s) of this MACRO makes any claim 
+#  of or offers any Warranty whatsoever with regard to the accuracy of 
+#  this MACRO or its suitability for use.  Minitab, Inc. and the author(s)
+#  of this MACRO each hereby disclaims any Warranty and/or liability with 
+#  respect thereto. 
+#
+#**************************************************************************
+
+twoztest x.1-x.k s1 s2; #  k should be 1 for stacked data, or 2 for unstacked data 
+grp g;		  #  this is for an optional grouping column if you have stacked data
+diff d;     	  #  the default difference is 0
+alt ah;     	  #  use 0 for "not equal", 1 for "greater than"  -1 for "less than" alternative; 
+                  #  "not equal" is the default
+alpha a.    	  #  default alpha is 0.05
+
+mcolumn x.1-x.k g nn x1 x2 junk ss mm sd sem glab messtemp 
+mconstant s1 s2 d ah a xbar1 xbar2 n1 n2 z cp pv dt az cr zc lci uci na1 na2 ttl dd aa cttl 
+mconstant cci nd vbl gval xcount gcount messdiff
+
+default d=0 ah=0 a=0.05 
+
+mreset
+noecho 
+brief 0
+notitle
+endmtitle
+
+if grp = 0  and k = 1
+  mtitle "2-Sample Z Test Macro Error";
+    notitle.
+  brief 2
+  print " **Error**  For unstacked data, you should specify two columns"
+  print "                 Macro Exiting"
+  endmtitle
+  exit
+elseif grp = 1 and k ne 1
+  mtitle "2-Sample Z Test Macro Error";
+    notitle.
+  brief 2
+  print " **Error**  For stacked data, you should specify only one column with the responses;"
+  print "                 If data are unstacked, remove the group variable. "
+  print "                 Macro Exiting"
+  endmtitle
+  exit
+endif
+
+# check that if a subscripts column grp is entered, it does not have more than 2 levels
+
+brief 0
+
+if grp = 1
+  stats;
+    by g;
+    gval glab.
+  n glab gval
+  n x.1 xcount
+  n g gcount
+  if gval ne 2
+    mtitle "2-Sample Z Test Macro Error";
+      notitle.
+    brief 2
+    print " **Error**  The specified group variable needs to have only two levels" 
+    print "                 Macro Exiting"
+    endmtitle
+    exit
+  elseif xcount ne gcount 
+  mtitle "2-Sample Z Test Macro Error";
+    notitle.
+  brief 2
+    print " **Error**  Unequal column length for your response and grouping variables"
+    print "                 Macro Exiting"
+    endmtitle
+    exit
+  endif
+endif
+
+# check that the two standard deviation values are > 0
+
+if s1 <= 0 or s2 <= 0
+  mtitle "2-Sample Z Test Macro Error";
+    notitle.
+  brief 2
+  print " **Error**  Population standard deviations should be both positive"
+  print "                 Macro Exiting"
+  endmtitle
+  exit
+endif
+
+# Check to validate the values for the alternative hypothesis
+
+if ah ne 0 and ah ne 1 and ah ne -1
+  mtitle "2-Sample Z Test Macro Error";
+    notitle.
+  brief 2
+    print " **Error**  Invalid entry for alternative hypothesis subcommand"
+    print "                 Macro Exiting"
+    endmtitle
+    exit
+endif
+
+# check for alpha expressed as % & re-express as probability if needed
+
+if alpha = 1
+  if (a >= 1) & (a <= 100)         # check for alpha expressed as %
+    divi a 100 a                   # re-express as probability
+  endif
+  if (a >= 1) | (a <= 0)           # check for illegal values of alpha
+    mtitle "2-Sample Z Test Macro Error";
+    notitle.
+    brief 2
+    print " **Error**  Value of alpha needs to be between (0, 1), exclusive"
+    print "                 Macro Exiting"
+    endmtitle
+    exit
+  endif
+endif
+
+
+if k=1  			# data is stacked, g is subscripts column
+
+dtype g dt
+	if dt = 0
+	vorder g;
+	worksheet.
+	else 
+	text g g
+	vorder g;
+	worksheet.
+	endif
+unstack x.1 x1 x2;
+  subscripts g.
+stats;
+  by g;
+  gvals nn.
+let na1=nn[1]
+let na2=nn[2]
+kkname vbl x.1
+name vbl "Variable is: "
+
+else
+kkname na1 x.1
+kkname na2 x.2
+copy na1 na2 nn
+copy x.1 x.2 x1 x2
+endif
+
+Let ttl = CONCATENATE("Two-Sample Z-Test and CI: ",na1,", ",na2)
+Mean x1 xbar1
+mean x2 xbar2
+count x1 n1
+count x2 n2
+let z = ((xbar1 - xbar2) - d)/sqrt((s1**2)/n1 + (s2**2)/n2)
+let aa = 100*(1-a)
+copy aa junk
+text junk junk
+let aa=junk[1]
+copy n1 n2 ss
+copy xbar1 xbar2 mm
+copy s1 s2 sd
+Let sem = sd/sqrt(ss)
+name nn "Group Variable"
+name ss "N"
+name mm "Sample Mean"
+name sd "Pop. StDev"
+name sem "SE Mean"
+name z "Z-Value"
+name pv "P-Value"
+
+	if ah=0
+	let az = abso(z)
+	CDF az cp;
+  	  Normal 0.0 1.0.
+	let pv = 2*(1 - cp)
+	let cr = 1-a/2
+	InvCDF cr zc;
+  	Normal 0.0 1.0.
+	let lci = (xbar1 - xbar2) - zc*sqrt((s1**2)/n1 + (s2**2)/n2)
+	let uci = (xbar1 - xbar2) + zc*sqrt((s1**2)/n1 + (s2**2)/n2)
+	copy lci uci junk
+	text junk junk
+	let lci=junk[1]
+	let uci=junk[2]	
+	name nd "Difference:"
+	let nd = CONCATENATE("        mu (",na1,") - mu (",na2,")")
+	let dd = xbar1 - xbar2
+	name dd "Estimate for difference:  "
+	Let cttl = CONCATENATE(aa,"% CI for difference: ")
+	Let cci = CONCATENATE("(",lci,", ",uci,")")
+	name cci cttl
+	#start printing things out
+	mtitle ttl;
+                    notitle.
+	brief 2
+	if k=1
+	prin vbl
+	endif
+	prin nn ss mm sd sem
+	prin nd dd cci 
+        let messtemp = d
+        text messtemp messtemp
+        name messdiff 'Two Sample Z test of Diff. ='
+        let messdiff = CONCATENATE(messtemp, " (vs not =):")
+        print messdiff
+	print z pv 
+
+	elseif ah=1
+	CDF z cp;
+  	  Normal 0.0 1.0.
+	let pv = 1 - cp
+	let cr = 1-a
+	InvCDF cr zc;
+  	Normal 0.0 1.0.
+	let lci = (xbar1 - xbar2) - zc*sqrt((s1**2)/n1 + (s2**2)/n2)
+	name nd "Difference:"
+	let nd = CONCATENATE("        mu (",na1,") - mu (",na2,")")
+	let dd = xbar1 - xbar2
+	name dd "Estimate for difference:  "
+	Let cttl = CONCATENATE(aa,"% lower bound for difference: ")
+	name lci cttl
+	#start printing things out
+	mtitle ttl;
+	  notitle.
+                  brief 2
+	if k=1
+	prin vbl
+	endif
+	notitle
+	prin nn ss mm sd sem
+	prin nd dd lci 
+        let messtemp = d
+        text messtemp messtemp
+        name messdiff 'Two Sample Z test of Diff. ='
+        let messdiff = CONCATENATE(messtemp, " (vs >):")
+        print messdiff
+	print z pv 
+
+	elseif ah=-1
+	CDF z cp;
+  	  Normal 0.0 1.0.
+	let pv = cp
+	let cr = 1-a
+	InvCDF cr zc;
+  	Normal 0.0 1.0.
+	let uci = (xbar1 - xbar2) + zc*sqrt((s1**2)/n1 + (s2**2)/n2)
+	name nd "Difference:"
+	let nd = CONCATENATE("        mu (",na1,") - mu (",na2,")")
+	let dd = xbar1 - xbar2
+	name dd "Estimate for difference:  "
+	Let cttl = CONCATENATE(aa,"% upper bound for difference: ")
+	name uci cttl
+	#start printing things out
+	mtitle ttl;
+	  notitle.
+	if k=1
+	prin vbl
+	endif
+	notitle
+	prin nn ss mm sd sem
+	note
+	prin nd dd uci 
+        let messtemp = d
+        text messtemp messtemp
+        name messdiff 'Two Sample Z test of Diff. ='
+        let messdiff = CONCATENATE(messtemp, " (vs <):")
+        print messdiff
+	print z pv 
+	endif 
+endmtitle
+endmacro

@@ -1,0 +1,158 @@
+macro 
+
+#
+#     Name:  Hild_Lu.MAC
+#   Author:  Cathy Akritas
+#  Version:  Minitab 18
+#
+#  Macro modified Sept 2016 to run in Minitab 18.
+#
+# The Hildreth - Lu procedure corrects for serial correlation 
+# (autocorrelation) in regression type data. 
+# 
+# To run the macro enter the command  
+# %hild_lu c c...c 
+# where the first c is your dependent variable and the c...c is your  
+# independent variables.   
+# 
+# The default values of rho, the correlation coefficient, are  -.9, -.8,  
+# -.7, -.6, -.5, -.4, -.3, -.2, -.1, 0, .1, .2, .3, .4, .5, .6, .7, .8, 
+# and .9 .  If you wish to use different values for RHO, store your values 
+# in a column, then run the command below.   
+#
+#  %hild_lu c c...c; 
+#  rho c.   
+#
+#  where c after rho is the column that contains the values of rho that 
+#  you  want to use.    
+# 
+#  Each value of rho is used in a general differencing transformation of 
+#  the data.  (The first data point is transformed into a missing value).  
+#  Each set of transformed data is used in a regression and the SSE is 
+#  recorded.  The value of rho that produced the smallest SSE is printed 
+#  and used to produce the final regression output using the transformed 
+#  data. 
+# 
+#  Reference: 
+#  "Econometric Models & Economic Forecasts" by Robert S. Pindyck  
+#  and Daniel L. Rubinfeld, Second Edition, McGraw Hill. 
+  
+###########################################################################
+#
+#  Neither Minitab, Inc. nor the author(s) of this MACRO makes any claim 
+#  of or offers any Warranty whatsoever with regard to the accuracy of 
+#  this MACRO or its suitability for use.  Minitab, Inc. and the author(s)
+#  of this MACRO each hereby disclaims any Warranty and/or liability with 
+#  respect thereto. 
+#
+###########################################################################
+hild_lu y x.1-x.n; 
+rho rhos.
+
+mcolumn y x.1 - x.n z.1 - z.n depen lagy lagx.1 - lagx.n mses SSE Rhos 
+mcolumn Coeff SE_Coeff allnames
+mconstant n rho_now mse rho_min no_rho i j  df stit1 stit2 yname xname
+mmatrix m1 
+
+mreset
+noecho
+brief 0
+notitle
+endmtitle
+
+if rho = 0 
+ set Rhos  
+   -.9:.9/.1 
+ end 
+else  
+endif 
+copy y x.1 - x.n depen z.1-z.n;
+  exclude;
+  where "y = '*' or x.1 = '*'".
+if n > 2
+  do i = 2:n
+    copy depen z.1-z.n depen z.1-z.n;
+      exclude;
+      where "z.i = '*'".
+  enddo
+endif
+let no_rho = count(Rhos) 
+do i  = 1:no_rho 
+  let rho_now = Rhos[i] 
+  lag 1 y lagy  
+  let depen =  y - rho_now*lagy 
+  #let depen[1] = y[1]*sqrt(1-rho_now**2) 
+  do j = 1:n 
+    lag 1 x.j lagx.j 
+    let z.j = x.j - rho_now*lagx.j 
+    #let z.j[1] = x.j[1]*sqrt(1-rho_now**2)  
+  enddo 
+  regress;
+    response depen;
+    continuous z.1 -z.n; 
+    terms z.1 - z.n;
+    nodefault;
+    mse mse.
+  
+  let mses[i] = mse 
+enddo 
+ 
+brief 2 
+notitle 
+let df = n(depen) - n - 1  
+let SSE = mses*df 
+ 
+Mtitle "Hildreth - Lu Procedure";
+  notitle.
+brief 2
+#Print "    For the given values of Rho, the SSE's from the corresponding regressions are: "
+#print SSE Rhos 
+sort SSE Rhos SSE Rhos 
+let rho_min = Rhos[1] 
+name rho_min "The Value of Rho that minimizes SSE = "
+print rho_min
+let depen =  y - rho_min*lagy 
+kkname yname y
+ #let depen(1) = y(1)*sqrt(1-rho_min**2) 
+let allnames[1] = "Terms"
+let allnames[2] = "Constant"
+do j = 1:n 
+  kkname xname x.j
+  stack allnames xname allnames
+  let z.j = x.j - rho_min*lagx.j 
+  #let z.j(1) = x.j(1)*sqrt(1-rho_min**2)  
+enddo 
+name Stit2 "The Regression results below" 
+let stit2 = concat("used Rho = ", rho_min, " to transform the data before running the regression")
+print stit2
+note 
+regress;
+  response depen;
+  continuous z.1 - z.n;
+  terms z.1 -z.n; 
+  nodefault;
+  tsimple;
+  tequation;
+  tsummary;
+  tcoeff;
+  tanova;
+  coeff coeff;
+  XPXINV M1;
+  mse mse.  
+#  secoef SE_Coeff. 
+
+diag m1 se_coeff
+let se_coeff = sqrt(mse*se_coeff)
+LET Coeff[1] = Coeff[1]/(1-rho_min) 
+Let SE_Coeff[1] = SE_Coeff[1]/(1-rho_min)  
+text coeff Se_coeff coeff se_coeff
+stack ("Coef" "SE Coef") (Coeff Se_Coeff) (Coeff Se_Coeff)
+endmtitle
+mtitle "Coefficients for the Non-Transformed Data ";
+  notitle. 
+print "   After the constant and the standard error for the constant are divided "
+print "   by (1-Rho_Min) the coefficients and standard error for the coefficients "
+print "   of the non-transformed data are "
+write Allnames Coeff SE_Coeff 
+endmtitle
+endmacro

@@ -1,0 +1,86 @@
+Macro
+#                                                                 
+#                    Minitab macro MULTINOM                       
+#                       John S. Heywood                           
+#                         October 2001    
+#                       Minitab 18 Version                        
+#                                                                 
+#  This macro computes multinomial probabilities.                 
+#  The command format is:                                         
+#                                                                 
+#  %multinom X P                                                  
+#                                                                 
+#  where X is the name of a column containing the frequencies     
+#  (integer counts), with as many rows as there are possible      
+#  values for the multinomial random variable, and P is the name  
+#  of a column containing the probabilities of success.  There    
+#  are no subcommands.  The multinomial probability is returned   
+#  in the Session window.                                         
+#                                                                 
+###########################################################################
+#
+#  Neither Minitab, Inc. nor the author(s) of this MACRO makes any claim 
+#  of or offers any Warranty whatsoever with regard to the accuracy of 
+#  this MACRO or its suitability for use.  Minitab, Inc. and the author(s)
+#  of this MACRO each hereby disclaims any Warranty and/or liability with 
+#  respect thereto. 
+#
+###########################################################################
+
+MULTINOM X P
+MCOLUMN X P PP
+MCONSTANT PR N PNORM K1 K2 K3 K4 K5 K6
+MReset
+Brief 0
+NoEcho
+NOTITLE
+endmtitle
+
+LET K1 = SUM(P)
+LET K2 = N(X)
+LET K3 = N(P)
+IF K2 ~= K3
+  MTITLE "Multinomial Probability Macro Error";
+    Notitle.
+  Brief 2
+  Print "ERROR - Column lengths not equal"
+  Print "Macro Exiting"
+  Endmtitle
+  GOTO 100
+ELSE IF ABS(K1-1) > .001
+  MTITLE "Multinomial Probability Macro Error";
+    Notitle.
+  Brief 2
+  print "ERROR - Probabilities do not sum to 1"
+  print "Macro Exiting"
+  endmtitle. 
+  GO TO 100
+ENDIF
+LET PP=P
+LET N = SUM(X)
+LET PR = 1
+LET PNORM = 1
+LET K1 = N(X)-1
+DO K2 = 1:K1
+  LET K5 = X[K2]
+  LET K6 = PP[K2]
+  PDF K5 K3;
+  BINOMIAL N K6.
+  LET PR = PR*K3
+  LET N = N-X[K2]
+  IF N=0
+    BREAK
+  ENDIF
+  LET PNORM = PNORM-P[K2]
+  LET K4 = K2+1
+  LET PP[K4] = PP[K4]/PNORM
+ENDDO
+NAME PR 'PROBABILITY ='
+  MTITLE "Multinomial Probability";
+    Notitle.
+  Brief 2
+PRINT PR
+endmtitle
+MLABEL 100
+
+ENDMACRO

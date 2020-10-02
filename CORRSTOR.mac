@@ -1,0 +1,119 @@
+macro
+
+###########################################################################
+#
+#       Macro: CORRSTOR.MAC
+#  Written by: Joel Smith, February 2012
+#     Version: Minitab 18
+#
+#  This macro calculates the correlation and p-value between each pair in 
+#  a group of columns and stores them in the worksheet.  
+#
+#  Suppose you have numeric data stored in columns C1-C20 and you want to
+#  find the correlation and p-value between each pair of columns. Stat > 
+#  Basic Statistics > Correlation will allow you to display them in the
+#  Session Window and store the correlations in a matrix.  However, this 
+#  macro will store them in the worksheet.
+#  
+#  You have to specify four storage columns for the output.
+#
+#  To store the correlations and p-values in C22-C25, choose Edit > Command 
+#  Line Editor.  Type the command 
+#
+#  %corrstor C1-C20 C22-C25
+#
+#  Click on Submit Commands.  
+#  The variable or column names are stored in C22 and C23, the correlations
+#  are stored in C24, and the p-values are stored in C25.
+#
+###########################################################################
+#
+#  Neither Minitab, Inc. nor the author(s) of this MACRO makes any claim 
+#  of or offers any Warranty whatsoever with regard to the accuracy of 
+#  this MACRO or its suitability for use.  Minitab, Inc. and the author(s)
+#  of this MACRO each hereby disclaims any Warranty and/or liability with 
+#  respect thereto. 
+#
+###########################################################################
+
+corrstor x.1-x.n var1 var2 corrs pvals
+
+mcolumn x.1-x.n y.1-y.n z.1 - z.n var1 var2 corrs pvals vcol1 vcol2 coli1 coli2 col1 col2 check
+mconstant a n i cname1 cname2 rown 
+mmatrix cormtx corrps
+
+mreset 
+brief 0
+noecho
+endmtitle
+
+erase var1 var2 corrs pvals
+
+#check to ensure that no columns are text
+do i = 1:n
+  dtype x.i a
+  if a = 0 or a = 10
+    mtitle "Correlation and P-Value Storage Macro Error";
+      notitle.
+    brief 2
+    print "   ***Error***  All data must be numeric.  Text columns and empty columns"
+    print "                are not allowed.   "
+    print " "
+    endmtitle
+    Exit
+  endif
+enddo
+
+#Make sure all columns have the same length
+do i = 1:n
+  count x.i a
+  stack check a check
+enddo
+
+stdev check a
+
+if a ne 0
+  mtitle "Correlation and P-Value Storage Macro Error";
+    notitle.
+  brief 2
+  print "   ***Error***  All columns must have the same number of rows.  The Counts "
+  print "                below should all be the same.  Missing values are OK.  "
+  print " "
+  Info
+  endmtitle
+  exit
+endif
+
+correlation x.1-x.n cormtx;
+  spvalues corrps.
+copy cormtx y.1-y.n
+copy corrps z.1 - z.n
+erase cormtx corrps
+do i=1:n
+  kkname cname1 x.i
+  let vcol1[i]=cname1
+  let coli1[i]=i
+enddo
+
+do i=1:n
+  kkname cname2 x.i
+  tset vcol2
+    1(cname2)n
+    end
+  erase coli2
+  set coli2
+    1(i)n
+    end
+  stack (var1 var2 col1 col2 corrs pvals)(vcol1 vcol2 coli1 coli2 y.i z.i)(var1 var2 col1 col2 corrs pvals)
+enddo
+
+copy var1 var2 col1 col2 corrs pvals var1 var2 col1 col2 corrs pvals;
+  exclude;
+    where "col2<=col1".
+
+sort var1 var2 corrs pvals var1 var2 corrs pvals;
+  by col1 col2.
+
+name var1 "Variable 1" var2 "Variable 2" corrs "Correlation" pvals "p-value"
+
+endmacro

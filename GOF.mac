@@ -1,0 +1,337 @@
+MACRO
+#
+#                                                                     
+#                      Minitab macro GOF                              
+#                       John S. Heywood                               
+#                         October 2001     
+#
+#  Macro edited Sept 2016 to run in Minitab 18                           
+#                                                                     
+#  This macro performs a goodness-of-fit test for discrete data.      
+#  Goodness of fit is assessed based on both the traditional          
+#  chi-square statistic and the G-statistic (the likelihood ratio     
+#  test).  The command format is:                                     
+#                                                                     
+#  %GOF O E;                                                          
+#  estimate N;                                                        
+#  exact.                                                             
+#                                                                     
+#  The command line argument O is the name of a column containing     
+#  the observed frequencies (integer counts), and the command         
+#  line argument E is the name of a column containing either the      
+#  expected numbers or the hypothesized probabilities.  The macro     
+#  will decide what type of information is stored in column E by      
+#  examining the sum of its elements.  It is necessary for the        
+#  entries in E to sum either to 1.0 (exactly) or to the total        
+#  sample size (exactly).                                             
+#                                                                     
+#  The optional subcommand "estimate N" allows the user to specify    
+#  the number (N) of parameters estimated from the data so that       
+#  the degrees of freedom of the test statistic can be reduced        
+#  accordingly.  The default value for N is zero.                     
+#                                                                     
+#  The optional subcommand "exact" invokes a routine that calculates   
+#  an exact P-value for the chi-square statistic based on the         
+#  multinomial distribution.  The exact test should be invoked only   
+#  when there are relatively few categories (2 or 3) and/or the       
+#  sample sizes are so small that the Chi-square approximation is     
+#  unreliable.  Because this routine repeatedly invokes built-in      
+#  Minitab functions, it is very inefficient and will require a       
+#  large amount of time to execute if sample sizes or the number of   
+#  categories are too large.                                          
+#                                                                     
+#  In the special case of two categories, the chi-square statistic    
+#  is calculated both without and with the Yates correction for       
+#  continuity.                                                        
+#                                                                     
+###########################################################################
+#
+#  Neither Minitab, Inc. nor the author(s) of this MACRO makes any claim 
+#  of or offers any Warranty whatsoever with regard to the accuracy of 
+#  this MACRO or its suitability for use.  Minitab, Inc. and the author(s)
+#  of this MACRO each hereby disclaims any Warranty and/or liability with 
+#  respect thereto. 
+#
+###########################################################################
+
+GOF OBS1 EXP1;
+ESTIMATE EST;
+EXACT.
+MCOLUMN OBS1 OBS EXP1 EXPECT X2C GC
+MCOLUMN F HP
+MCONSTANT NC NO NE1 NU NL EST DF X2 X2Y X2M G P PM
+MCONSTANT K1 K2 K3 K4 K5 K6 K7 K8 K9
+DEFAULT EST = 0
+
+notitle
+noecho
+endmtitle
+
+LET OBS = OBS1
+IF EST > 0 AND EXACT = 1
+  MTITLE "Goodness of Fit Test";
+    NOTITLE.
+  brief 2
+  Print " Note: Exact test not applicable when parameters have been estimated."
+  Print "       Exact test will not be performed."
+  endmitle
+  LET EXACT = 0
+ENDIF
+LET NC = N(OBS)
+IF EXACT = 1 AND NC > 10
+  MTITLE "Goodness of Fit Test";
+    NOTITLE.
+  brief 2
+  Print " Note: Exact test is limited to variables with no more than ten"
+  Print "       categories.  Exact test will not be performed."
+  endmtilte
+  LET EXACT = 0
+ENDIF
+LET NO = SUM(OBS)
+LET NE1 = SUM(EXP1)
+IF ABS(NE1-1) < .001
+  LET HP=EXP1
+  LET EXPECT = EXP1*NO
+ELSE IF ABS(NE1-NO) < .001
+  LET HP = EXP1/NE1
+  LET EXPECT = EXP1
+ELSE
+  MTITLE "Goodness of Fit Test Macro Error";
+    NOTITLE.
+  brief 2
+  Print " Error: Incorrect sum of expected values."
+  endmtitle
+  exit
+ENDIF
+IF N(OBS) ~= N(EXPECT)
+  MTITLE "Goodness of Fit Test Macro Error";
+    NOTITLE.
+  brief 2
+  Print " Error: column lengths not equal"
+  endmtitle
+  exit 
+ENDIF
+NAME OBS 'OBSERVED' EXPECT 'EXPECTED' X2C '(O-E)**2/E' P 'P-VALUE'
+NAME G 'G-STATISTIC' GC '2*O*ln(O/E)'
+NAME X2 'CHI-SQUARE VALUE' NC 'NUMBER OF CATEGORIES'
+NAME X2Y 'YATES CORRECTED CHI-SQUARE'
+NAME EST 'PARAMETERS ESTIMATED' DF 'DEGREES OF FREEDOM'
+LET X2C = (OBS-EXPECT)**2/EXPECT
+LET X2 = SUM(X2C)
+DO K1 = 1:NC
+  IF OBS(K1) = 0
+    LET GC(K1) = 0
+  ELSE
+    LET GC(K1) = 2*OBS(K1)*LOGE(OBS(K1)/EXPECT(K1))
+  ENDIF
+ENDDO
+LET G = SUM(GC)
+LET DF = NC-1-EST
+brief 0
+MTITLE "Goodness of Fit Test";
+  NOTITLE.
+brief 2
+PRINT OBS EXPECT X2C GC
+PRINT NC EST DF
+CDF X2 P;
+  CHISQUARE DF.
+LET P = 1-P
+PRINT X2 P
+
+IF NC = 2
+  LET X2C = (ABS(OBS-EXPECT)-.5)**2/EXPECT
+  LET X2Y = SUM(X2C)
+  CDF X2Y P;
+  CHISQUARE DF.
+  LET P = 1-P
+  PRINT X2Y P
+  endmtitle
+  NOTE
+ENDIF
+CDF G P;
+  CHISQUARE DF.
+LET P = 1-P
+PRINT G P
+endmtitle
+IF EXACT = 0
+  GOTO 100
+ENDIF
+
+#
+# The following calculates an exact P-value from the multinomial distribution,
+# using the chi-square value as the test statistic.  This calculation is valid
+# only if no parameters have been estimated from the data.
+#
+#NOTE
+#NOTE Thinking . . . 
+Mtitle "Calculating the exact P-Value, this could take awhile...";
+  notitle.  
+LET P=0
+LET NU=0
+LET NL=NO
+DO K1 = 0:NL
+  LET F(1) = K1
+  LET NU=K1
+  IF NC = 2
+    LET F(2) = NO-NU
+    LET X2M = SUM((F-EXPECT)**2/EXPECT)
+    IF X2M >= X2
+      CALL MULTINOM F HP PM
+      LET P=P+PM
+    ENDIF
+    NEXT
+  ENDIF
+  LET NL = NO-NU
+#
+DO K2 = 0:NL
+  LET F(2) = K2
+  LET NU=K1+K2
+  IF NC = 3
+    LET F(3) = NO-NU
+    LET X2M = SUM((F-EXPECT)**2/EXPECT)
+    IF X2M >= X2
+      CALL MULTINOM F HP PM
+      LET P=P+PM
+    ENDIF
+    NEXT
+  ENDIF
+  LET NL = NO-NU
+#
+DO K3 = 0:NL
+  LET F(3) = K3
+  LET NU=K1+K2+K3
+  IF NC = 4
+    LET F(4) = NO-NU
+    LET X2M = SUM((F-EXPECT)**2/EXPECT)
+    IF X2M >= X2
+      CALL MULTINOM F HP PM
+      LET P=P+PM
+    ENDIF
+    NEXT
+  ENDIF
+  LET NL = NO-NU
+#
+DO K4 = 0:NL
+  LET F(4) = K4
+  LET NU=K1+K2+K3+K4
+  IF NC = 5
+    LET F(5) = NO-NU
+    LET X2M = SUM((F-EXPECT)**2/EXPECT)
+    IF X2M >= X2
+      CALL MULTINOM F HP PM
+      LET P=P+PM
+    ENDIF
+    NEXT
+  ENDIF
+  LET NL = NO-NU
+#
+DO K5 = 0:NL
+  LET F(5) = K5
+  LET NU=K1+K2+K3+K4+K5
+  IF NC = 6
+    LET F(6) = NO-NU
+    LET X2M = SUM((F-EXPECT)**2/EXPECT)
+    IF X2M >= X2
+      CALL MULTINOM F HP PM
+      LET P=P+PM
+    ENDIF
+    NEXT
+  ENDIF
+  LET NL = NO-NU
+#
+DO K6 = 0:NL
+  LET F(6) = K6
+  LET NU=K1+K2+K3+K4+K5+K6
+  IF NC = 7
+    LET F(7) = NO-NU
+    LET X2M = SUM((F-EXPECT)**2/EXPECT)
+    IF X2M >= X2
+      CALL MULTINOM F HP PM
+      LET P=P+PM
+    ENDIF
+    NEXT
+  ENDIF
+  LET NL = NO-NU
+#
+DO K7 = 0:NL
+  LET F(7) = K7
+  LET NU=K1+K2+K3+K4+K5+K6+K7
+  IF NC = 8
+    LET F(8) = NO-NU
+    LET X2M = SUM((F-EXPECT)**2/EXPECT)
+    IF X2M >= X2
+      CALL MULTINOM F HP PM
+      LET P=P+PM
+    ENDIF
+    NEXT
+  ENDIF
+  LET NL = NO-NU
+#
+DO K8 = 0:NL
+  LET F(8) = K8
+  LET NU=K1+K2+K3+K4+K5+K6+K7+K8
+  IF NC = 9
+    LET F(9) = NO-NU
+    LET X2M = SUM((F-EXPECT)**2/EXPECT)
+    IF X2M >= X2
+      CALL MULTINOM F HP PM
+      LET P=P+PM
+    ENDIF
+    NEXT
+  ENDIF
+  LET NL = NO-NU
+#
+DO K9 = 0:NL
+  LET F(9) = K9
+  LET NU=K1+K2+K3+K4+K5+K6+K7+K8+K9
+  LET F(10) = NO-NU
+  LET X2M = SUM((F-EXPECT)**2/EXPECT)
+  IF X2M >= X2
+    CALL MULTINOM F HP PM
+    LET P=P+PM
+  ENDIF
+#
+ENDDO
+ENDDO
+ENDDO
+ENDDO
+ENDDO
+ENDDO
+ENDDO
+ENDDO
+ENDDO
+
+Name P "Exact Chi-Square Test p-value"
+Mtitle "Goodness of Fit Test";
+notitle.
+PRINT P
+endmtitle
+MLABEL 100
+ENDMACRO
+#
+MACRO
+MULTINOM X P PR
+MCOLUMN X P PP
+MCONSTANT PR N PNORM K1 K2 K3 K4 K5 K6
+
+brief 0
+LET PP=P
+LET N = SUM(X)
+LET PR = 1
+LET PNORM = 1
+LET K1 = N(X)-1
+DO K2 = 1:K1
+  LET K5 = X(K2)
+  LET K6 = PP(K2)
+  PDF K5 K3;
+  BINOMIAL N K6.
+  LET PR = PR*K3
+  LET N = N-X(K2)
+  IF N=0
+    BREAK
+  ENDIF
+  LET PNORM = PNORM-P(K2)
+  LET K4 = K2+1
+  LET PP(K4) = PP(K4)/PNORM
+ENDDO
+ENDMACRO

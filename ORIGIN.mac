@@ -1,0 +1,359 @@
+macro
+###########################################################################
+#
+#       Macro:  ORIGIN.MAC 
+#
+#  Written by:  Cathy Akritas  March 2003
+#     Updated:  April 2004
+#     Version:  Minitab 18
+#
+#  This macro performs a regression through the origin for a single 
+#  independent variable (X) and produces a graph of the original data 
+#  with the fitted line overlaid.  You can display the confidence bands 
+#  for the fitted regression line and/or the prediction bands. 
+#
+#  The default confidence level is 95%, but you have the option of 
+#  changing this.  You can also input your own title for the graph, as 
+#  well as store the residuals from the regression for further analysis.  
+#  It is strongly suggested that the residuals from any regression model 
+#  be checked for randomness and normality.
+#
+#  Suppose your dependent variable, Y, is in C1 and your independent 
+#  variable, X, is in C2.  To run the macro with all the default settings, 
+#  choose Edit > Command Line Editor...  Type the command 
+#  
+#  %ORIGIN C1 C2
+#
+#  and click on Submit Commands.  
+#
+#  To display the 95% confidence bands, use the subcommand CI.  Choose 
+#  Edit > Command Line Editor... Type in the following
+#
+#  %ORIGIN C1 C2;
+#    CI.
+#
+#  and click on Submit Commands.
+#
+#  To display the 95% prediction bands, use the subcommand PI.  Choose 
+#  Edit > Command Line Editor... Type in the following 
+#
+#  %ORIGIN C1 C2;
+#  PI.
+#
+#  and click on Submit Commands.
+#
+#  To change the confidence level to something other than the default 
+#  value of 95%, use the CONF subcommand.  Suppose you want to change the 
+#  confidence level to 90%, choose Edit > Command Line Editor... and type 
+#  the following
+#  
+#  %ORIGIN C1 C2;
+#  CONF 90;
+#  CI;
+#  PI.     
+#
+#  and click on Submit Commands.
+#
+#  To store the residuals of the regression through the origin, use the 
+#  subcommand RESIDS.  Suppose you want to store your residuals in C4 and 
+#  display the confidence bands, choose Edit > Command Line Editor... and 
+#  type the following
+#
+#  %ORIGIN C1 C2;
+#  CI;
+#  RESIDS C4.
+#
+#  To enter your own title use the subcommand TITLE.  Suppose you want to 
+#  use the title "Data Collected in the Field" and display the confidence 
+#  and prediction bands, choose Edit > Command Line Editor... and type the 
+#  following 
+#
+#  %ORIGIN C1 C2;
+#  CI;
+#  PI;
+#  TITLE "Data Collected in the Field".
+#     
+#  and click on Submit Commands.
+#
+###########################################################################
+#
+#  Neither Minitab, Inc. nor the author(s) of this MACRO makes any claim 
+#  of or offers any Warranty whatsoever with regard to the accuracy of 
+#  this MACRO or its suitability for use.  Minitab, Inc. and the author(s)
+#  of this MACRO each hereby disclaims any Warranty and/or liability with 
+#  respect thereto. 
+#
+###########################################################################
+
+origin y x;
+conf a;
+CI;
+PI;
+resids errs;
+title ttl.
+
+mcolumn x y x1 y1 xsort yhat CIL CIU PIL PIU beta aa errs std yhi ylo
+mconstant a ynme xnme eq1 eq2 eq3 eq4 eq5 ytype xtype var fn1 
+mconstant fn2 fn3 fn4 fn5 fn6 fn7 fn8 fn9 fn10 s slab1 slab2 ast ttl
+mconstant xmin ymax ymin ytext
+
+default a = 95
+mreset
+brief 0
+noecho
+notitle
+endmtitle
+
+dtype y ytype
+dtype x xtype
+
+if (ytype eq 0) or (xtype eq 0)
+   mtitle "Fitted Line through the Origin Macro Error";
+      notitle.
+   brief 2
+   Print " *** Error *** Text data not allowed; Execution aborted"
+   endmtitle
+   goto 100
+endif
+
+# filter out missing, check for at least 3 rows of data
+copy y x y1 x1;
+   omit y = '*'.
+copy y1 x1 y1 x1;
+   omit x1 = '*'.
+if count(y1)< 3
+  mtitle "Fitted Line through the Origin Macro Error";
+    notitle.
+  brief 2
+   print " *** Error *** Must have at least 3 non-missing observations; "
+   print "                     Execution aborted"
+   endmtitle
+   goto 100  
+endif
+
+# check for y's all same
+if stan(y1) = 0
+  mtitle "Fitted Line through the Origin Macro Error";
+    notitle.
+  brief 2
+  print " *** Error *** All data in dependent variable are the same; "
+  print "                    Execution aborted"
+  endmtitle
+  goto 100
+endif
+
+# check for x's all same
+if stan(x1) = 0
+  mtitle "Fitted Line through the Origin Macro Error";
+    notitle.
+  brief 2
+  print " *** Error *** All data in independent variable are the same;"
+  print "                    Execution aborted"
+  endmtitle
+  goto 100
+endif
+
+if a <= 1
+   mult a 100 a
+endif
+ 
+if (conf = 1) and ((a >= 100) or (a <= 0))
+  mtitle "Fitted Line through the Origin Macro Error";
+    notitle.
+  brief 2
+  print " *** Error *** Confidence level must be greater than 0 and less than 100;"
+  print "                    Execution aborted"
+  endmtitle
+  goto 100
+endif
+
+regress;
+  response y;
+  contin x;
+  terms x;
+  noconstant;
+  nodefault;
+  confidence a;
+  coefficients beta;
+  resid errs;
+  mse var.
+
+  predict y;
+    nodefault;
+    CPredictors x;
+    pfits yhat;
+    climits CIL CIU;
+    plimits PIL PIU.
+
+Mtitle "Fitted Line Plot through the Origin";
+  notitle.
+brief 2
+regress;
+  response y;
+  contin x;
+  terms x;
+  noconstant;
+  tsimple.
+brief 0
+
+sort x yhat CIL CIU PIL PIU xsort yhat CIL CIU PIL PIU;
+by x.
+
+let std = sqrt(var)
+text std std
+kkset slab1 "S = "
+copy std s ;
+use 1. 
+kkcat slab1 s slab2
+
+if ci = 0 and pi =0
+  maxi y ymax
+  mini y ymin
+  let ytext = ymax + (ymax-ymin)/4
+elseif ci =1 and pi=0
+  stack y CIU yhi
+  stack y CIL ylo
+  maxi yhi ymax
+  mini ylo ymin
+  let ytext = ymax + (ymax-ymin)/8
+elseif ci = 0 and pi= 1
+  stack y PIU yhi
+  stack y PIL ylo
+  maxi yhi ymax  
+  mini ylo ymin
+  let ytext = ymax + (ymax-ymin)/8
+elseif ci = 1 and pi =1
+  stack y CIU PIU yhi
+  stack y CIL PIL ylo
+  maxi yhi ymax
+  mini ylo ymin
+  let ytext = ymax + (ymax-ymin)/8
+endif 
+
+let xmin = mini(x) - (maxi(x) - mini(X))/5
+let ymax = ymax + (ymax-ymin)/24
+let ymin = ymin - (ymax-ymin)/24
+
+kkname ynme y
+kkname xnme x
+kkset eq1 " = "
+
+text beta beta;
+width 10.
+
+let eq2 = beta(1)
+kkset ast "*"
+kkcat ynme eq1 eq3 
+kkcat eq3 eq2 eq4
+kkcat eq4 ast eq3
+kkcat eq3 xnme eq5
+
+copy a aa
+text aa aa
+copy aa fn2
+kkset fn1 "Red Lines = "
+kkset fn3 "% Confidence Interval"
+kkcat fn1 fn2 fn4
+kkcat fn4 fn3 fn5
+
+kkset fn6 "Blue Lines = "
+kkset fn8 "% Prediction Interval"
+kkcat fn6 fn2 fn9
+kkcat fn9 fn8 fn10 
+
+if title = 0
+  kkset ttl "Regression Through the Origin" 
+endif
+
+if CI = 0 and PI = 0
+   Plot y*x;
+    wtitle eq5;
+    title ttl;
+    title eq5;
+      tsize 1.125;
+    Symbol;
+    Line xsort yhat;
+    Data 0.125 0.925 0.15 0.8.
+elseif CI = 1 and PI = 0
+  plot y*x;
+    Scale 2;
+    MODEL 1;
+      Min ymin;
+      Max ymax;
+    EndMODEL;
+    wtitle eq5;
+    title ttl;
+    title eq5;
+      tsize 1.125;
+    tsize 1;
+    Symbol;
+    Line xsort yhat;  
+    line xsort CIU;
+      type 2;
+      color 2;
+    line xsort CIL;
+      type 2;
+      color 2;
+    Data 0.125 0.925 0.15 0.8;
+    footnote fn5;
+      right;
+      tsize .75.
+elseif CI = 0 and pI = 1
+  plot y*x;
+    Scale 2;
+    MODEL 1;
+      Min ymin;
+      Max ymax;
+    EndMODEL;
+    wtitle eq5;
+    title ttl;
+    title eq5;
+      tsize 1.125;
+    Symbol;
+    Line xsort yhat;  
+    line xsort PIU;
+      type 4;
+      color 4;
+    line xsort PIL;
+      type 4;
+      color 4;
+    Data 0.125 0.925 0.15 0.8;
+    footnote fn10;
+      right;
+      tsize .75.
+elseif CI = 1 and PI = 1
+  plot y*x;
+    Scale 2;
+    MODEL 1;
+      Min ymin;
+      Max ymax;
+    EndMODEL;
+    wtitle eq5;
+    title ttl;
+    title eq5;
+      tsize 1.125;
+    Symbol;
+    Line xsort yhat;  
+    line xsort CIU;
+      type 2;
+      color 2;
+    line xsort CIL;
+      type 2;
+      color 2;
+    line xsort PIU;
+      type 4;
+      color 4;
+    line xsort PIL;
+      type 4;
+      color 4;
+    Data 0.125 0.925 0.15 0.8;
+    footnote fn5;
+      right;
+      tsize .75;
+    footnote fn10;
+      tsize .75;
+      right.
+endif
+mlabel 100
+endmtitle
+endmacro

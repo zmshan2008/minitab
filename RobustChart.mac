@@ -1,0 +1,370 @@
+macro
+###############################################################################
+#
+#    Macro: RobustChart.MAC
+#  Version:  Minitab 18
+#
+#    Created by: Eduardo Santiago and Daniel Griffith 10/11/2011
+#  Submitted on: 4/10/2012
+#
+#  This macro creates an Xbar-S chart that is robust to the presence of 
+#  diffuse and localized disturbances, i.e. either a shift affecting specific 
+#  subgroups or extreme individual observations within a subgroup. Since 
+#  Phase I estimates are assumed to be calculated from a process that is
+#  stable and under statistical control, robust parameter estimates need to 
+#  be computed in the presence of special cause variation. For more technical 
+#  details about the algorithm, check the references below:
+#
+#  1. Tatum, L.G. (1997). "Robust Estimation of the Process Standard 
+#  Deviation for Control Charts", Technometrics, Vol. 39(2): 127-141.
+#
+#  2. Schoonhoven, M., Nazir, H.Z., Riaz, M., and Does, R.J.M.M. (2011). 
+#  "Robust Location Estimators for the Xbar Control Chart", JQT. Vol. 
+#  43(4): 363-379.
+#
+#  The use of this current version of the macro is limited to subgroups of size 
+#  5, 7, 9, 11, 13, or 15. As to the number of subgroups, we assume the user will 
+#  have either 20, 30, or 40. If one of these conditions is not met, the macro 
+#  will produce an error message and exit. The reason for this limitation is that 
+#  the unbiasing constants needed to calculate a robust estimate of sigma are  
+#  currently only available for these values. 
+#
+#  To run the macro, the observations need to be on a single column, and a second 
+#  column needs to be entered to indicate the subgroups.
+#
+#  Save the macro to your default Macros folder location. Choose Edit > Command 
+#  Line Editor.  Assuming the data is in C1 and the subgroup information is 
+#  in C3, type the following:
+#
+#  %RobustChart C1 C3
+#  
+#  Click on the Submit Commands button.  The graph will be added to your 
+#  project.
+#
+#  The optional subcommands EXCLUDE will allow you to specify a different  
+#  percentage for the trimmed means (default is 20%). The second subcommand
+#  gives us the flexibility of incorporating other tuning parameters. Currently,
+#  only the unbiasing constants for c=7 and c=10 have been included as part of  
+#  this macro.
+#
+###############################################################################
+#
+#  Neither Minitab, Inc. nor the author(s) of this MACRO makes any claim 
+#  of or offers any Warranty whatsoever with regard to the accuracy of 
+#  this MACRO or its suitability for use.  Minitab, Inc. and the author(s)
+#  of this MACRO each hereby disclaims any Warranty and/or liability with 
+#  respect thereto. 
+#
+###############################################################################
+RobustChart data subgr;
+exclude perctrim;
+tuning c.
+
+mcolumn data subgroup isub sdata trimean imedian nsub strim sortsub rmsub tmvi 
+mcolumn index InCtrl temp1 temp2 remove outE imean residual Mi h_i IQR IQRs  
+mcolumn u_ij Ssize k20 k30 k40 subgr data2 aa bb cc
+mconstant a b c d i j k n v z q1 q3 tm20 tmv perctrim ucl lcl D7 TMstar uclstar 
+mconstant lclstar subsize Xbarbar odd mprime Mstar Sc dstar k2
+
+default perctrim=0.2 c=7 
+
+mreset
+notitle
+noEcho
+Brief 0
+endmtitle
+
+let subgroup = subgr
+
+### Error Checking ###
+If perctrim < 0 or perctrim > 0.4
+  call writerror 1
+Elseif c NE 7 and c NE 10
+  call writerror 2
+Endif
+
+dtype data j
+If j NE 2 and j NE 1
+  call writerror 3
+Endif
+
+stats data;
+  by subgroup;
+  gval isub;
+  medi imedian;
+  N nsub.
+
+count isub k
+
+if k = 20 or k = 30 or k = 40
+else
+  call writerror 5
+endif
+
+### Calculate the most common subgroup size ###
+Tally nsub;
+  Counts;
+  Store temp1 temp2.
+Sort temp1 temp2 temp1 temp2;
+  By temp2;
+  Descending temp2.
+
+let subsize = temp1[1]
+
+if subsize = 5 or subsize = 7 or subsize = 9 or subsize = 11 or subsize = 13 or subsize = 15
+else
+  call writerror 4
+endif
+
+### Step A. Calculate the trimmed means for each subgroup ###
+
+do i = 1:k
+
+	copy data sdata;
+	include;
+	where "subgroup=isub[i]".
+
+	sort sdata sdata;
+	by sdata.
+
+	let a=ceiling(nsub[i]/4,0)
+	let b=nsub[i]-a+1
+	let q1=sdata[a]
+	let q3=sdata[b]
+	let trimean[i]=0.5*(imedian[i]+(q1+q3)/2)
+
+	let a=ceiling(nsub[i]/4,0)
+	let b=nsub[i] - a + 1
+	let IQR[i] = sdata[b] - sdata[a]
+
+enddo
+
+
+### Step B. Find the trimmed mean of the trimmed means ###
+
+let v=ceiling((k*perctrim)+1,0)
+let z=ceiling(k-(k*perctrim),0)
+
+sort trimean isub strim sortsub;
+by trimean.
+
+count strim n
+
+Set index
+  1( 1 : n / 1 )1
+  End.
+
+copy strim tmvi;
+include;
+where "index >=v and index <= z".
+
+let tm20=(1/(k-2*ceiling(k*perctrim,0))*sum(tmvi))
+
+### Step C. Plot the TM's on a control chart with limits as follows ###
+
+## Tatum's calculation of sigma ##
+
+Convert isub imedian subgroup Mi
+Convert isub IQR subgroup IQRs
+let residual = if(data - Mi=0,'*',data - Mi)
+let odd = MOD(subsize,2)
+if odd = 1
+  let mprime = (subsize-1)*k
+else
+  let mprime = subsize*k
+endif
+let Mstar = median(abs(residual))
+let h_i = if(IQRs/Mstar <= 4.5, 1, if(IQRs/Mstar > 7.5, c, IQRs/Mstar - 3.5))
+let u_ij = if(abs(h_i*residual/(c*Mstar)) < 1,h_i*residual/(c*Mstar),'*')
+
+let Sc = mprime/sqrt(mprime -1)*sqrt(sum(residual^2*(1-u_ij^2)^4))/abs(sum((1-u_ij^2)*(1-5*u_ij^2)))
+
+## Unbiasing constants
+set k20
+1.07  1.057  1.052 1.047 1.044 1.041
+end
+set k30
+1.069  1.056  1.051 1.046 1.044 1.041
+end
+set k40
+1.068  1.056  1.05 1.046 1.043 1.041
+end
+set Ssize
+5 7 9 11 13 15
+end
+
+do i=1:6
+  if Ssize[i]=subsize
+    break
+  endif
+enddo
+
+let dstar = if(k=20,k20[i],if(k=30,k30[i],if(k=40,k40[i],0)))
+let D7 = Sc/dstar
+
+## End of sigma calculation ##
+
+let ucl = tm20 + 3*D7/sqrt(subsize)
+let lcl = tm20 - 3*D7/sqrt(subsize)
+
+
+### Step D. Find the mean of the TM's that are inside the control limits ###
+
+let InCtrl = if(trimean >= lcl and trimean <= ucl,1,'*')
+let TMstar = mean(trimean*InCtrl)
+nmiss InCtrl a
+
+Mtitle "Robust Chart Macro Output";
+  notitle.
+
+if a > 0  #at least one subgroup is left out 
+  copy isub aa;
+    include;
+      where "InCtrl = '*'".
+  brief 1
+  print "   Excluded Subgroups"
+  print aa;
+    format(f15.6).
+else
+  Print "   No Subgroups Excluded"
+endif
+
+brief 0
+  
+### Step E. Create an I chart for all individuals (except those excluded in D.) ###
+
+let lclstar = TMstar - 3*D7
+let uclstar = TMstar + 3*D7
+
+
+### Step F. Remove any points within the subgroups, outside of LCL* < y < UCL * ###
+
+# Expand the column InCtrl to match the original raw data #
+
+Convert isub InCtrl subgroup remove
+
+let outE = if(data >= lclstar and data <= uclstar,1,'*')
+let subgroup = if(outE='*' or remove='*','*',subgroup)
+
+nmiss outE b
+
+if b > 0  #at least one row is left out 
+  count subgr d
+  set bb
+  1:d
+  end
+  copy bb subgr bb cc;
+    include;
+    where "outE = '*'".
+  if a > 0    #check these row numbers with the row no.s of the excluded subgroups
+    tally cc;
+      store temp1 temp2.
+    n temp1 j    
+
+    if a = j
+      if temp1 = aa
+        erase bb
+        goto 15
+      endif
+    endif
+
+    do i = 1:j
+      let k2 = aa[i]
+      copy bb cc bb cc;
+        exclude;
+        where "cc = k2".
+    enddo
+  endif
+endif
+  
+mlabel 15
+count bb b
+brief 1
+
+if b > 0
+  print "   Excluded Rows"  
+  Print bb;
+    format(f15.6).
+else  
+  Print "   No Individual Rows Where Excluded"
+endif
+brief 0
+
+### Step G. Find subgroup means for subgroups left after D. & points removed in F. ###
+
+stats data;
+  by subgroup;
+  mean imean;
+  N nsub.
+
+let Xbarbar = mean(imean)
+Copy Data Subgroup Data2 Subgroup;
+  Exclude;
+  Where "Subgroup='*'".
+
+XSChart Data2 Subgroup;
+  Title "Robust Xbar-S control chart - Phase I";
+  Footnote &
+      "Sigma based on Tatum (1997) and mean based on Schoonhoven et al. (2011)";
+  Mu Xbarbar;
+  Sigma D7.
+endmtitle
+endmacro
+
+###############################
+
+macro
+
+writerror x
+
+mconstant x
+brief 0
+
+if x = 1
+  mtitle "Robust Chart Macro Error";
+    notitle.
+  brief 2
+  print "** Error ** Please choose a value between (0%, 40%] to trim the means"
+  print "                 Macro Exiting"
+  endmtitle
+  exit
+elseif x = 2 
+  mtitle "Robust Chart Macro Error";
+    notitle.
+  brief 2
+  print "** Error ** The unbiasing constants are only available for the tuning" 
+  print "                 parameters of c=7 and c=10" 
+  print "                 Macro Exiting"
+  endmtitle
+  exit
+elseif x = 3 
+  mtitle "Robust Chart Macro Error";
+    notitle.
+  brief 2
+  print "** Error ** Incorrect data type for observations. The observations must be numeric"
+  print "                 Macro Exiting"
+  endmtitle
+  exit
+elseif x = 4
+  mtitle "Robust Chart Macro Error";
+    notitle.
+  brief 2
+  print "** Error ** Invalid subgroup size. In order to calculate the unbiasing "
+  print "                 constant for the standard deviation, this macro only considers "
+  print "                 subgroup sizes for the following: {5, 7, 9, 11, 13, 15}"
+  print "                 Macro Exiting"
+  endmtitle
+  exit
+elseif x = 5
+  mtitle "Robust Chart Macro Error";
+    notitle.
+  brief 2
+  print "** Error ** Invalid number of subgroups. In order to calculate the "
+  print "                 unbiasing constant for the standard deviation, this macro "
+  print "                 only considers a specific number of subgroups: {20, 30, 40}"
+  print "                 Macro Exiting"
+  endmtitle
+  exit
+endif
+
+endmacro

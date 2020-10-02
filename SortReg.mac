@@ -1,0 +1,188 @@
+macro
+#
+#         Macro: SortReg.mac
+#       Version: Minitab 18
+#
+#  Submitted by: Andrew M. Haines  10/09/08
+#
+#  This macro performs simple regression for a single response versus each 
+#  specified predictor, one predictor at a time.  For each predictor, the 
+#  R-squared and p-value are calculated.  These values are then sorted 
+#  from the smallest to the largest p-value and displayed in a table.
+#
+#  Suppose the response data is in C3, and the predictors are in columns 
+#  C4, C6, and C9.  To run the macro, in Minitab choose Edit > Command Line 
+#  Editor and type
+#
+#  %sortreg C3 C4 C6 C9
+#
+#  Click Submit Commands.   
+#
+############################################################################
+#
+#  Neither Minitab, Inc. nor the author(s) of this MACRO makes any claim 
+#  of or offers any Warranty whatsoever with regard to the accuracy of 
+#  this MACRO or its suitability for use.  Minitab, Inc. and the author(s)
+#  of this MACRO each hereby disclaims any Warranty and/or liability with 
+#  respect thereto. 
+#
+############################################################################
+
+sortreg y x.1-x.n
+
+mcolumn y x.1-x.n
+mcolumn pred slope rsq pval one betacol yhat yy xx oo
+mconstant i kpred cnt beta0 beta1 ybar sumyybar sumyyhat gof sigma sxx xmean
+mconstant tstat pcon df titl1 titl2 titl typ
+mmatrix xmat ymat xpmat xpx xpxinv xpymat betamat
+
+mreset
+noecho
+brief 0
+notitle
+endmtitle
+
+#
+# Error checking
+#
+
+# Numeric response
+dtype y typ
+
+if typ = 0 or typ = 10
+  call writerror 1
+endif
+
+# Numeric predictors
+do i = 1:n
+  dtype x.i typ
+
+  if typ = 0 or typ = 10
+    call writerror 2
+  endif
+enddo
+
+# At least 2 rows of data
+count y cnt
+
+if cnt < 2
+  call writerror 3
+endif
+
+#
+# Run each regression
+set one
+(1)cnt
+end
+
+do i = 1:n
+  copy one x.i y oo xx yy;
+    exclude;
+    where "x.i = '*' or y = '*'".
+
+  count yy cnt
+
+  if cnt < 2
+    call writerror 3
+  endif
+
+  subt 2 cnt df
+  copy yy ymat
+  mean yy ybar
+
+  let sumyybar = sum((yy - ybar)**2)
+
+  # Predictor name
+  kkname kpred x.i
+  stack pred kpred pred
+
+  # Coefficient
+  copy oo xx xmat
+  transpose xmat xpmat
+  mult xpmat xmat xpx
+  inverse xpx xpxinv
+  mult xpmat ymat xpymat
+  mult xpxinv xpymat betamat
+  copy betamat betacol
+  let beta0 = betacol(1)
+  let beta1 = betacol(2)
+  stack slope beta1 slope
+
+  # R-squared
+  let yhat = beta0 + (beta1 * xx)
+  let sumyyhat = sum((ybar - yhat)**2)
+  divide sumyyhat sumyybar gof
+  mult gof 100 gof
+  stack rsq gof rsq
+
+  # P-value
+  let sigma = sqrt(sum((yy - yhat)**2) / df)
+  mean xx xmean
+  let sxx = sum((xx - xmean)**2)
+  let tstat = abs((beta1 / sigma) * sqrt(sxx))
+  cdf tstat pcon;
+    t df.
+  subt pcon 1 pcon
+  mult pcon 2 pcon
+  stack pval pcon pval
+enddo
+
+#
+# Sort
+#
+sort pred slope rsq pval pred slope rsq pval;
+  by pval.
+
+#let rsq = round(rsq,1)
+#let pval = round(pval,3)
+
+#
+# Display results
+#
+name pred "Predictor"
+name slope "Slope"
+name rsq "R-Squared"
+name pval "P-Value"
+
+let titl1 = "Sorted Simple Regression for "
+kkname titl2 y
+kkcat titl1 titl2 titl
+
+mtitle titl;
+  notitle.
+brief 2
+print pred slope rsq pval
+endmtitle
+endmacro
+
+macro
+writerror x
+mconstant x
+
+if x = 1
+  Mtitle " Sorted Regression Macro Error";
+    notitle.
+  brief 2
+  print " ** ERROR ** Response must be numeric or date/time"
+  print "                         Macro Exiting"
+  endmtitle
+  exit
+elseif x = 2
+  Mtitle " Sorted Regression Macro Error";
+    notitle.
+  brief 2
+  print " ** ERROR ** All predictors must be numeric or date/time"
+   print "                        Macro Exiting"
+  endmtitle
+  exit
+elseif x = 3
+  Mtitle " Sorted Regression Macro Error";
+    notitle.
+  brief 2
+  print " ** ERROR ** 2 or more non-missing rows of data required"
+    print "                       Macro Exiting"
+  endmtitle
+  exit
+endif
+
+endmacro

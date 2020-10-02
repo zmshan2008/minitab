@@ -1,0 +1,176 @@
+macro
+#
+#         Macro: SortAOV.mac
+#       Version: Minitab 18
+#
+#  Submitted by: Andrew M. Haines  10/09/08
+#
+#  This macro performs One-Way ANOVA for a single response versus each 
+#  specified factor, one factor at a time.  For each factor, the R-squared 
+#  and p-value are calculated.  These values are then sorted from the 
+#  smallest to the largest p-value and displayed in a table.
+#
+#  Suppose the response data is in C1, and the factors are in columns C3,
+#  C4, and C5.  To run the macro, in Minitab choose Edit > Command Line 
+#  Editor and type
+#
+#  %sortaov C1 C3-C5
+#
+#  Click Submit Commands.   
+#
+############################################################################
+#
+#  Neither Minitab, Inc. nor the author(s) of this MACRO makes any claim 
+#  of or offers any Warranty whatsoever with regard to the accuracy of 
+#  this MACRO or its suitability for use.  Minitab, Inc. and the author(s)
+#  of this MACRO each hereby disclaims any Warranty and/or liability with 
+#  respect thereto. 
+#
+############################################################################
+
+sortaov y x.1-x.n
+
+mcolumn y x.1-x.n 
+mcolumn pred rsq pval yhat xvalcol ymeancol meanscol table1
+mconstant i kpred cnt ybar sumyybar sumyyhat gof k1
+mconstant pcon titl1 titl2 titl typ sse ssr dfe dfr fstat
+
+mreset
+noecho
+brief 0
+notitle
+endmtitle
+
+#
+# Error checking
+#
+
+# Numeric response
+dtype y typ
+
+if typ = 0 or typ = 10
+  call writerror 1
+endif
+
+# At least 2 rows of data
+count y cnt
+
+if cnt < 2
+  call writerror 3
+endif
+
+#
+# Run each ANOVA
+#
+mean y ybar
+
+let sumyybar = sum((y - ybar)**2)
+
+do i = 1:n
+  # Factor name
+  kkname kpred x.i
+  stack pred kpred pred
+
+  # R-squared
+  stats y;
+    by x.i;
+    gval xvalcol;
+    mean ymeancol.
+
+  let dfr = count(ymeancol) - 1
+  let dfe = cnt - dfr - 1
+
+  conv xvalcol ymeancol x.i meanscol
+
+  let sse = sum((y - meanscol)**2)
+  let ssr = sum((ybar - meanscol)**2)
+
+  let gof = 100 * (ssr / (ssr + sse))
+  stack rsq gof rsq
+
+  # P-value
+  if sse = 0
+    call writerror 2
+  elseif dfr = 0
+    call writerror 4
+  endif
+
+  let fstat = (ssr * dfe) / (sse * dfr)
+
+  cdf fstat pcon;
+    f dfr dfe.
+
+  subt pcon 1 pcon
+
+  stack pval pcon pval
+enddo
+
+#
+# Sort
+#
+sort pred rsq pval pred rsq pval;
+  by pval.
+
+let rsq = round(rsq,2)
+let pval = round(pval,6)
+
+#
+# Display results
+#
+name pred "Factor"
+name rsq "R-Squared"
+name pval "P-Value"
+
+let titl1 = "Sorted One-Way ANOVA for "
+kkname titl2 y
+kkcat titl1 titl2 titl
+
+mtitle titl;
+  notitle.
+brief 2
+print pred rsq pval
+
+endmtitle
+endmacro
+
+macro
+writerror x
+mconstant x
+
+brief 0
+
+if x = 1
+  Mtitle "Sorted One-Way ANOVA Macro Error";
+    notitle.
+  brief 2
+  print " ** ERROR ** Response must be numeric or date/time"
+  print "                      Macro Exiting"
+  endmtitle
+  exit
+elseif x = 2
+  Mtitle "Sorted One-Way ANOVA Macro Error";
+    notitle.
+  brief 2
+  print " ** ERROR ** Only one response at each level"
+  print "                      Macro Exiting"
+  endmtitle
+  exit
+elseif x = 3
+  Mtitle "Sorted One-Way ANOVA Macro Error";
+    notitle.
+  brief 2
+  print " ** ERROR ** 2 or more rows of data required"
+  print "                      Macro Exiting"
+  endmtitle
+  exit
+elseif x = 4
+  Mtitle "Sorted One-Way ANOVA Macro Error";
+    notitle.
+  brief 2
+  print " ** ERROR ** There must be at least two levels"
+  print "                      Macro Exiting"
+  endmtitle
+  exit
+endif
+
+endmacro

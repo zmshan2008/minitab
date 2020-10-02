@@ -1,0 +1,153 @@
+gmacro
+
+#    Macro:  CCData.MAC
+#   Author:  Isaac Newton
+#  Version:  Minitab 18
+#
+#  This macro will prompt you for key input.  
+# 
+#  You must show the Command Line window prior to running the macro.
+#  To show the Command Line window, click anywhere in the Session 
+#  window to make it the active window.  Go to the top menu bar, select 
+#  Editor > Show Command Line.  The Session window is now segmented into two 
+#  panes.  The pane on the right is the Command Line window which displays the 
+#  "MTB>" prompt. Launch the macro typing
+#  
+#  %ccdata
+#
+#  at the MTB > prompt and hit <Enter>.
+#
+###########################################################################
+#
+#  Neither Minitab, Inc. nor the author(s) of this MACRO makes any claim 
+#  of or offers any Warranty whatsoever with regard to the accuracy of 
+#  this MACRO or its suitability for use.  Minitab, Inc. and the author(s)
+#  of this MACRO each hereby disclaims any Warranty and/or liability with 
+#  respect thereto. 
+#
+###########################################################################
+ccdata
+
+MRESET
+BRIEF 2
+noecho
+
+new
+
+NOTE      
+NOTE ENTER NUMBER OF SUBGROUPS
+READ c1;
+ FILE 'TERMINAL';
+ NOBS 1.
+LET K1 = C1(1)
+
+NOTE        
+NOTE ENTER SUBGROUP SIZE
+READ c1;
+ FILE 'TERMINAL';
+ NOBS 1.
+LET K2 = C1(1)
+
+NOTE        
+NOTE ENTER DATA MEAN
+READ c1;
+ FILE 'TERMINAL';
+ NOBS 1.
+LET K6 = C1(1)
+
+NOTE        
+NOTE ENTER GROUP VARIATION
+READ c1;
+ FILE 'TERMINAL';
+ NOBS 1.
+LET K7 = C1(1)
+
+NOTE        
+NOTE ENTER SUBGROUP VARIATION
+READ c1;
+ FILE 'TERMINAL';
+ NOBS 1.
+LET K8 = C1(1)
+LET K7 = K7*(K8**(-1/2))
+
+NOTE        
+NOTE ADD ANY NON RANDOM EFFECTS? (Y/N)
+BRIEF 0
+DELETE 1 C1
+READ c1;
+ FILE 'TERMINAL';
+ FORMAT (A1);
+ NOBS 1.
+LET K10 = C1(1)
+DELETE 1 C1
+
+
+RANDOM k1 c1;
+  NORMAL K6 K7.
+
+DO k3 = 1:K1 
+LET K4 = k3+2
+LET k5 = C1(k3)
+  RANDOM k2 ck4;
+    NORMAL k5 K8.
+ENDDO
+
+Name c1 'control' c2  'sub'
+Stack C3-Ck4 'control';
+  Subscripts 'sub'.
+
+DELETE 1:K2 C3-CK4
+
+IF K10 = "y" OR K10 = "Y"
+RANDOM 1 C3;
+  INTEGER 1 2.
+LET K11 = C3(1)
+
+###NOBRIEF
+###NOTE K11
+###BRIEF 0
+
+IF K11 = 1
+RANDOM 1 C3;
+  INTEGER 1 K1.
+LET K11 = C3(1)
+LET K13 = K1*K2
+LET K12 = (K11-1)*K2+1
+
+RANDOM 1 C3;
+  NORMAL 0 K6.
+LET K15 = C3(1)/5
+
+DO K14 = K12:K13
+RANDOM 1 C3;
+  NORMAL K15 K8.
+LET K16 = C3(1)
+LET C1(K14)=C1(K14)+K16
+ENDDO
+ELSEIF K11 =2
+RANDOM 1 C3;
+  INTEGER 1 K1.
+
+LET K11 = C3(1)
+LET K13 = K1*K2
+LET K12 = (K11-1)*K2+1
+
+RANDOM 1 C3;
+  NORMAL 0 K6.
+LET K15 = C3(1)
+LET K16 = 0
+
+  DO K14 = K12:K13
+    RANDOM 1 C3;
+      NORMAL K15 K8.
+    LET K16 = (C3(1)/20)*(K14-K12) 
+    LET C1(K14)=C1(K14)+K16
+  ENDDO
+
+ENDIF
+
+ENDIF
+ERASE K1 - K16
+ENDMACRO
+
+

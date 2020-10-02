@@ -1,0 +1,94 @@
+macro
+###########################################################################
+#
+#       Macro: HISTTAB.MAC
+#  Written by: Cathy Akritas     September 2005  Updated August 2009
+#     Version: Minitab 18
+#
+#  This macro displays the frequency and percent of observations that fall 
+#  into the default bins created by histogram or capability analysis.  
+#
+#  Suppose your data is in C1 and you want to display the frequency for 
+#  each of the bins in the default histogram.  To run this macro, choose 
+#  Edit > Command Line Editor.  Type the command 
+#
+#  %HISTTAB C1
+#
+#  and click on Submit Commands.
+#
+#  The output in the Session Window will look something like
+#
+#  Table of Counts from Histogram 
+#                            Cumulative               Cumulative 
+#  Row  Intervals     Counts     Counts     Percents    Percents
+#    1  12.5 to 17.5       1          1      12.5           12.5
+#    2  17.5 to 22.5       1          2      12.5           25.0
+#    3  22.5 to 27.5       1          3      12.5           37.5
+#    4  27.5 to 32.5       0          3       0.0           37.5
+#    5  32.5 to 37.5       3          6      37.5           75.0
+#    6  37.5 to 42.5       0          6       0.0           75.0
+#    7  42.5 to 47.5       2          8      25.0          100.0
+#
+#  Just as with MINITAB's histogram algorithm, observations that fall on 
+#  interval boundaries are placed into the interval to the right, with one 
+#  exception:  observations on the boundary of the interval that is 
+#  farthest to the right are placed in the last interval.
+#
+###########################################################################
+#
+#  Neither Minitab, Inc. nor the author(s) of this MACRO makes any claim 
+#  of or offers any Warranty whatsoever with regard to the accuracy of 
+#  this MACRO or its suitability for use.  Minitab, Inc. and the author(s)
+#  of this MACRO each hereby disclaims any Warranty and/or liability with 
+#  respect thereto. 
+#
+###########################################################################
+
+histtab x
+mcolumn x Freqs bins binslo binshi Ints Percents cumcnts cumpercs
+mconstant lo hi inc cnt i j binlo binhi k1 total
+
+mreset
+noecho
+brief 0
+notitle
+endmtitle 
+
+#Get Histogram bins
+HCut X Bins
+#Categorize data into bins
+let cnt = n(bins) - 2
+
+do i = 1:cnt
+  let j = i+1
+  let binlo=bins[i]
+  let binhi=bins[j]
+  let Freqs[i] = sum((x ge binlo) and (x < binhi))
+enddo
+  
+let i = cnt + 1
+let j = i + 1
+let binlo=bins[i]
+let binhi=bins[j]
+let Freqs[i] = sum((x ge binlo) and (x le binhi))  
+let total = sum(freqs)
+ 
+copy bins binslo;
+  exclude;
+  rows j.
+
+copy bins binshi;
+  exclude;
+  rows 1.
+
+let Ints = concat(binslo, " to ", binshi)
+let cumcnts = parsum(Freqs)
+let Percents = (Freqs*100)/total
+let cumpercs = parsum(percents)
+name Ints 'Intervals' Freqs 'Frequencies' cumcnts 'Cumulative Frequencies' cumpercs 'Cumulative Percents'
+Mtitle "Frequency Table of the Intervals Created by the Default Histogram";
+  notitle.
+brief 2
+print Ints Freqs Cumcnts Percents Cumpercs
+endmtitle
+endmacro

@@ -1,0 +1,109 @@
+macro
+#
+#
+#        Name: WSTAT.MAC
+#  Written by: Veronica Powell    February 2005
+#
+#  This macro calculates the weighted mean and weighted standard deviation 
+#  of a column of data based on a frequency or weight column.  
+#
+#  Suppose the data is in C1 and the given frequencies are in C2, such 
+#  that the columns might look like the following:
+#  
+#    C1    C2
+#  Data   Freq
+#    1     10
+#    2     15
+#    3      9
+#    4     10
+#
+#  To run the macro, choose Edit > Command Line Editor and type the 
+#  command 
+#
+#  %wstat c1 c2
+#
+#  Click Submit Commands.  
+#
+###########################################################################
+#
+#  Neither Minitab, Inc. nor the author(s) of this MACRO makes any claim 
+#  of or offers any Warranty whatsoever with regard to the accuracy of 
+#  this MACRO or its suitability for use.  Minitab, Inc. and the author(s)
+#  of this MACRO each hereby disclaims any Warranty and/or liability with 
+#  respect thereto. 
+#
+###########################################################################
+wstat data wts
+mcolumn data wts  tmp
+mconstant nprime dtyp wtyp dcnt wcnt check mcol stcol
+
+mreset
+noecho
+brief 0
+notitle
+endmtitle
+
+# error checking
+dtype data dtyp
+dtype wts wtyp
+
+if dtyp = 0 or dtyp = 3 or wtyp < 1 or wtyp > 2
+  call writerror 3
+endif
+
+count data dcnt
+count wts wcnt
+
+if dcnt <> wcnt
+  call writerror 1
+endif
+
+let check = sum(wts <= 0)
+if check > 0
+  mtitle "Weighted Mean and Standard Deviation Macro Error";
+    notitle.
+  brief 2
+  Print "** Error ** Weights must be greater than or equal to 0"
+  Print "                 Macro Exiting"
+  endmtitle
+  exit
+endif
+
+# calculate the weighted mean
+Name mcol 'Weighted Mean'
+Let mcol = sum(wts * data) / sum(wts)
+
+# calculate the weighted standard deviation
+copy wts tmp;
+omit wts 0.
+count tmp nprime
+Name stcol 'Weighted StDev'
+
+Let stcol = sqrt(sum(wts * (data - mcol)**2) / ((nprime -1) * sum(wts) / nprime))
+
+mtitle "Weighted Mean and Standard Deviation";
+  notitle.
+brief 2
+print mcol stcol
+endmtitle
+endmacro
+
+##########
+
+macro
+writerror x
+mconstant x
+
+
+mtitle "Weighted Mean and Standard Deviation Macro Error";
+  notitle.
+brief 2
+if x = 1
+  print "** Error ** Input columns have different lengths"
+elseif x = 3
+  print "** Error ** Input columns need to be numeric"
+endif
+print "                 Macro Exiting"
+endmtitle
+exit
+endmacro

@@ -1,0 +1,209 @@
+macro
+
+###########################################################################
+#
+#  Name:        CICORR.MAC
+#  Version:     Minitab 18
+#  Written by:  Eli Walters on 6/26/2009
+#  
+#  This macro calculates a confidence bound or interval for a correlation
+#  coefficient.  Suppose you have the following test scores in C1 and C2
+#  of the worksheet:
+#
+#   X	  Y
+#  ---	---
+#   86	 77
+#   75	 85
+#   63	 70
+#   64	 57
+#   92	 83
+#
+#  By default, the 95% confidence interval is calculated.  For the default
+#  result, go to Edit > Command Line Editor and type the following:
+#
+#  %cicorr C1 C2
+#
+#  Use the optional subcommand OSIDE to obtain only a lower (enter 1) or
+#  upper (enter 2) confidence bound.  To change the confidence level of the
+#  interval or bound, use the subcommand CONF.  If you want to obtain a 90%
+#  upper confidence bound on the correlation coefficient, type:
+#
+#  %cicorr C1 C2;
+#  conf 90;
+#  oside 2.
+#
+#  The estimated correlation and the bound/interval will be provided in the
+#  Session window.
+#
+#  NOTE: Bivariate normality is an assumption for this calculation.
+#
+#  Reference:  M.G. Kendal and A. Stuart, The Advanced Theory of Statistics,
+#              Vol. 1, 2nd Ed, 1963, pp 390-391.
+#                               
+###########################################################################
+#
+#  Neither Minitab, Inc. nor the author(s) of this MACRO makes any claim 
+#  of or offers any Warranty whatsoever with regard to the accuracy of 
+#  this MACRO or its suitability for use.  Minitab, Inc. and the author(s)
+#  of this MACRO each hereby disclaims any Warranty and/or liability with 
+#  respect thereto. 
+#
+###########################################################################
+
+cicorr x y;
+oside bnd;
+conf lvl.
+
+mcolumn x y m1 m2 txt1 txt2 len
+mconstant a bnd xtyp ytyp lenx leny r lvl cbnd mtxt lvlt zval k1 k2 mlen msg
+mmatrix m
+
+default lvl=95
+
+mreset
+brief 0
+noecho
+notitle
+endmtitle
+##########
+# error checking
+##########
+
+dtype x xtyp
+dtype y ytyp
+
+if (xtyp <> 1 and xtyp<>2) or (ytyp<>1 and ytyp<>2)
+  Mtitle "Confidence Interval for a Correlation Coefficient";
+    notitlte.  
+  brief 2
+  print "     "
+  print " ** Error ** Input columns must be numeric"
+  print " "
+  endmtitle
+  exit
+endif
+
+n x lenx
+n y leny
+
+if lenx<=2 or leny<=2
+  Mtitle "Confidence Interval for a Correlation Coefficient";
+    notitlte.  
+  brief 2
+  print " ** Error ** At least three data points must be provided"
+  print " "
+  endmtitle
+  exit
+endif
+
+if lenx <> leny
+  Mtitle "Correlation Coefficient Confidence Interval Macro Error";
+    notitlte.  
+  brief 2
+  print " ** Error ** Input columns have different lengths"
+  print " "
+  endmtitle
+  exit
+endif
+
+if oside=1
+  if bnd<>1 and bnd<>2
+    Mtitle "Correlation Coefficient Confidence Interval Macro Error";
+      notitlte.  
+    brief 2
+    print " ** Error ** With OSIDE, please enter either 1 (for lower bound) or 2 (for upper bound)"
+    print " "
+    endmtitle
+    exit
+  endif
+endif
+
+let len[1]=lenx
+let len[2]=leny
+
+let mlen=min(len)
+
+##########
+# calculations
+##########
+
+corr x y m
+copy m m1 m2
+let r=m2[1]
+name r "Estimated Correlation (r):"
+
+let a=lvl/100
+
+if oside=0
+  let a=a+((1-a)/2)
+endif
+
+copy lvl txt1
+fnumeric txt1;
+fixed 0.
+text txt1 txt1
+let txt1=concat(txt1,"%")
+copy txt1 lvlt
+
+invcdf a zval;
+norm 0 1.
+
+if r = -1 or r = 1
+  goto 12
+endif
+
+if mlen=3
+  let k1=((0.5)*loge((1+r)/(1-r)))-(zval*(sqrt(mlen+1)/(mlen-1)))
+  let k2=((0.5)*loge((1+r)/(1-r)))+(zval*(sqrt(mlen+1)/(mlen-1)))
+else
+  let k1=((0.5)*loge((1+r)/(1-r)))-(zval/sqrt(mlen-3))
+  let k2=((0.5)*loge((1+r)/(1-r)))+(zval/sqrt(mlen-3))
+endif
+
+let k1=(exp(k1)-exp(-k1))/(exp(k1)+exp(-k1))
+let k2=(exp(k2)-exp(-k2))/(exp(k2)+exp(-k2))
+
+let txt2[1]=k1
+let txt2[2]=k2
+fnumeric txt2;
+fixed 3.
+text txt2 txt2
+
+if oside=1
+
+  if bnd=1
+    let cbnd=txt2[1]
+    kkset mtxt " Lower Bound for Rho: "
+  else if bnd=2
+    let cbnd=txt2[2]
+    kkset mtxt " Upper Bound for Rho: "
+
+  endif
+
+else
+
+  let cbnd=concat("(",txt2[1],", ",txt2[2],")")
+  kkset mtxt " CI for Rho: "
+  
+endif
+
+
+kkcat lvlt mtxt msg
+name cbnd msg
+
+mlabel 12
+if r<>-1 and r<>1
+  mtitle "Inference about Correlation Coefficient";
+    notitle.
+  brief 2
+  print r cbnd
+else
+  mtitle "Inference about Correlation Coefficient";
+    notitle.
+  brief 2
+  print r
+  print "     NOTE: Bound or interval cannot be calculated when r = -1 or r = 1"
+ endif
+endmtitle
+endmacro
+

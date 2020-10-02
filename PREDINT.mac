@@ -1,0 +1,288 @@
+macro
+
+###########################################################################
+#
+#  Name:        PREDINT.MAC
+#  Version:     Minitab 18
+#  Written by:  Eli Walters on 7/17/2009
+#
+#  From a current sample of data from a population, this macro calculates
+#  a prediction bound or interval for a single future observation from the
+#  population (if the future sample size is 1, which is the default
+#  setting) or for the mean and standard deviation of a future sample from
+#  the population (if the future sample size is > 1).
+#
+#  Suppose you have the following sample of data in C1 of the worksheet:
+#
+#   X
+#  ---
+#   86
+#   75
+#   63
+#   64
+#   92
+#   72
+#
+#  By default, the 95% prediction interval for a single future value is
+#  calculated.  For the default result, go to Edit > Command Line Editor
+#  and type the following:
+#
+#  %predint C1
+#
+#  Use the optional subcommand OSIDE to obtain only a lower (enter 1) or
+#  upper (enter 2) prediction bound.  To change the confidence level of the
+#  interval or bound, use the subcommand CONF.  If you want to obtain a 90%
+#  upper prediction bound on a single future value, type:
+#
+#  %predint C1;
+#  conf 90;
+#  oside 2.
+#
+#  Use the optional subcommand OBS to change the future sample size (default
+#  is 1).  For a future sample size greater than 1, a prediction interval or
+#  bound will be calculated for both the mean and standard deviation of the
+#  future sample.  If you want to obtain a 99% prediction interval for the
+#  mean and standard deviation of a future sample of size 10, type:
+#
+#  %predint C1
+#  conf 99;
+#  obs 10.
+#
+#  The estimated mean, standard deviation, and bounds/intervals will be
+#  provided in the Session window.
+#
+#  Reference:  Hahn and Meeker (1991), pp 61-64.
+#                               
+###########################################################################
+#
+#  Neither Minitab, Inc. nor the author(s) of this MACRO makes any claim 
+#  of or offers any Warranty whatsoever with regard to the accuracy of 
+#  this MACRO or its suitability for use.  Minitab, Inc. and the author(s)
+#  of this MACRO each hereby disclaims any Warranty and/or liability with 
+#  respect thereto. 
+#
+###########################################################################
+
+predint x;
+oside bnd;
+conf lvl;
+obs m.
+
+mcolumn x txt1 txt2 txt3 txt4
+mconstant bnd xtyp ytyp lenx lvl cbnd cbnd2 mtxt lvlt k1 k2 msg moe
+mconstant k3 k4 fval fval2 tval mn s df df2 m mt mn2 chk
+
+default lvl=95
+default m=1
+
+mreset
+brief 0
+noecho
+notitle
+endmtitle
+
+##########
+# error checking
+##########
+
+n x lenx
+
+if lenx<2
+  call writerror 4
+endif
+
+dtype x xtyp
+
+if (xtyp <> 1 and xtyp<>2)
+  call writerror 3
+endif
+
+if oside=1
+  if bnd<>1 and bnd<>2
+    call writerror 2
+  endif
+endif
+
+let s=stdev(x)
+
+if s=0
+  call writerror 1
+endif
+
+if lvl<1 or lvl>=100
+  call writerror 5
+endif
+
+##########
+# calculations
+##########
+
+let chk=round(lvl,0)
+let chk=lvl/chk
+
+copy lvl txt1
+if chk=1
+  fnumeric txt1;
+  fixed 0.
+else
+  fnumeric txt1;
+  fixed 1.
+endif
+text txt1 txt1
+let txt1=concat(txt1,"%")
+copy txt1 lvlt
+
+copy m txt4
+fnumeric txt4;
+fixed 0.
+text txt4 txt4
+copy txt4 mt
+name mt "Future Sample Size:"
+
+let lvl=lvl/100
+let df=lenx-1
+let mn=mean(x)
+name mn "Estimated Mean:"
+name s "Estimated Standard Deviation:"
+
+copy mn mn2
+name mn2 "Estimated Value:"
+
+if oside=0
+  let lvl=lvl+((1-lvl)/2)
+endif
+
+invcdf lvl tval;
+t df.
+
+let moe=tval*sqrt((1/lenx)+(1/m))*s
+let k1=mn-moe
+let k2=mn+moe
+
+let txt2[1]=k1
+let txt2[2]=k2
+fnumeric txt2;
+fixed 4.
+text txt2 txt2
+let txt2=trim(txt2)
+
+if m>1
+  let df2=m-1
+
+  invcdf lvl fval;
+  f df df2.
+
+  invcdf lvl fval2;
+  f df2 df.
+
+  let k3=s*sqrt(1/fval)
+  let k4=s*sqrt(fval2)
+
+  let txt3[1]=k3
+  let txt3[2]=k4
+  fnumeric txt3;
+  fixed 4.
+  text txt3 txt3
+  let txt3=trim(txt3)
+
+endif
+
+if oside=1
+
+  if bnd=1
+    let cbnd=txt2[1]
+    kkset mtxt " Lower Prediction Bound: "
+    if m>1
+      let cbnd2=txt3[1]
+    endif
+  else if bnd=2
+    let cbnd=txt2[2]
+    kkset mtxt " Upper Prediction Bound: "
+    if m>1
+      let cbnd2=txt3[2]
+    endif
+  endif
+
+else
+
+  let cbnd=concat("(",txt2[1],", ",txt2[2],")")
+  if m>1
+    let cbnd2=concat("(",txt3[1],", ",txt3[2],")")
+  endif
+  kkset mtxt " Prediction Interval: "
+  
+endif
+
+kkcat lvlt mtxt msg
+name cbnd msg
+name cbnd2 msg
+
+if m>1
+mtitle "Prediction Interval for Mean & StDev of a Future Sample";
+    notitle.
+  brief 2
+  print mt mn cbnd
+  print s cbnd2
+  endmtitle
+else
+  mtitle "Prediction Interval for a Single Future Observation";
+    notitle.
+  brief 2
+  print mt mn2 cbnd
+  endmtitle
+endif
+
+endmacro
+
+###########################
+###########################
+
+macro
+
+writerror x
+
+mconstant x
+brief 0
+if x = 1
+  mtitle "Prediction Interval Macro Error";
+  notitle.
+  brief 2
+  print "** Error ** Values in input column cannot all be the same"
+  print "                 Macro Exiting"
+  endmtitle
+  exit
+elseif x = 2
+  mtitle "Prediction Interval Macro Error";
+  notitle.
+  brief 2
+  print "** Error ** With OSIDE, enter either 1 (lower bound) or 2 (upper bound)"
+  print "                 Macro Exiting"
+  endmtitle
+  exit
+elseif x = 3
+  mtitle "Prediction Interval Macro Error";
+  notitle.
+  brief 2
+  print "** Error ** Input column must be numeric"
+  print "                 Macro Exiting"
+  endmtitle
+  exit
+elseif x = 4
+  mtitle "Prediction Interval Macro Error";
+  notitle.
+  brief 2
+  print "** Error ** Input column must contain at least two nonmissing values"
+  print "                 Macro Exiting"
+  endmtitle
+  exit
+elseif x = 5
+  mtitle "Prediction Interval Macro Error";
+  notitle.
+  brief 2
+  print "** Error ** Confidence level must be a number between 1 and 100"
+  print "                 Macro Exiting"
+  endmtitle
+  exit
+endif
+
+endmacro

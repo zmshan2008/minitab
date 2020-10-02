@@ -1,0 +1,133 @@
+macro
+
+############################################################### 
+#
+#
+#     Name:  EXPAND.MAC 
+#   Author:  Andy Haines
+#  Version:  Minitab 18
+#
+#  This macro "untallies" data by taking a frequency table and creating
+#  from it a single column of data.  
+#
+#  Suppose the data values are in C1, the frequencies are in C2, 
+#  and you want the results stored in C3. Choose Edit > Command Line 
+#  Editor and type
+# 
+#  %expand C1 C2 C3
+#
+#     Data    Freqs     C3
+#       5       2        5
+#       6       3        5
+#       7       1        6
+#                        6
+#                        6
+#                        7
+#                               
+#
+###########################################################################
+#  
+#  NOTE: Macro modified to include text data by Mindy Tomlinson 10/20/2010
+#
+###########################################################################
+#
+#  Neither Minitab, Inc. nor the author(s) of this MACRO makes any claim 
+#  of or offers any Warranty whatsoever with regard to the accuracy of 
+#  this MACRO or its suitability for use.  Minitab, Inc. and the author(s)
+#  of this MACRO each hereby disclaims any Warranty and/or liability with 
+#  respect thereto. 
+#
+###########################################################################
+expand a b c
+
+mcolumn a b c tmp brnd aa bb cc
+mconstant atmp btmp i n acnt bcnt atyp btyp
+
+mreset
+noecho
+brief 0
+notitle
+endmtitle
+
+copy a b aa bb;
+  exclude;
+    where "b = 0 or b = '*'".
+
+##########
+# error checking
+##########
+dtype aa atyp
+dtype bb btyp
+
+if btyp <> 2
+  call writerror 3
+endif
+
+count aa acnt
+count bb bcnt
+let brnd = round(bb, 0)
+
+if acnt <> bcnt
+  call writerror 1
+endif
+
+if bb <> brnd
+  call writerror 2
+endif
+
+##########
+# calculations
+##########
+do i = 1:acnt
+  copy aa atmp;
+    use i.
+  copy bb btmp;
+    use i.
+  if btmp <> 0 AND (atyp = 1 OR atyp = 2 OR atyp = 3)
+    set tmp
+      (atmp)btmp
+    end
+  elseif btmp <> 0 AND atyp = 0
+    tset tmp
+      (atmp)btmp
+    end
+  endif
+  stack cc tmp cc
+enddo
+
+copy cc c
+
+if atyp = 3
+  date c c
+endif
+endmacro
+
+##########
+
+macro
+writerror x
+mconstant x
+
+if x = 1
+  mtitle "Expand Frequency Table Macro Error";
+    notitle. 
+  brief 2
+  Print " ** Error ** Input columns have different lengths"
+  endmtitle
+  exit
+elseif x = 2
+  mtitle "Expand Frequency Table Macro Error";
+    notitle. 
+  brief 2
+  print " ** Error ** Some values in frequency column are not integers"
+  endmtitle
+  exit
+elseif x = 3
+  mtitle "Expand Frequency Table Macro Error";
+    notitle.   
+  brief 2
+  print " ** Error ** Frequency column must be numeric"
+  endmtitle
+  exit
+endif
+endmacro

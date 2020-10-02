@@ -1,0 +1,104 @@
+macro
+###############################################################################  
+#
+#         Macro:  FISCAL.MAC 
+#    Written by:  Daniel Griffith---September 2007
+#
+#  This macro converts a date column to a column containing the fiscal 
+#  quarter and year.  By default, the fiscal year begins in July.
+#  
+#  This macro requires two input columns, where the first column contains 
+#  the date column and the second column is where you would like the 
+#  fiscal quarter - year to be stored in the worksheet.   
+#
+#  Suppose your date column is in C1, and you would like the fiscal 
+#  quarter-year to be stored in column C2, choose Edit > Command Line 
+#  Editor.... Type in the command
+#  
+#  %fiscal c1 c2
+#  
+#  and click on Submit Commands.
+#
+#  To change the starting month of the fiscal year, use the START 
+#  subcommand.  Suppose you want to have the fiscal year start in October, 
+#  choose Edit > Command Line Editor.... Type in the following
+#  
+#  %fiscal c1 c2;
+#  start 10.
+#  
+#  and click on Submit Commands.
+#
+#  To store the fiscal month in the Minitab worksheet, use the MONTH 
+#  subcommand.  Suppose you want to store the fiscal month in column C3, 
+#  choose Edit > Command Line Editor.... Type in the following
+#
+#  %fiscal c1 c2;
+#  start 10;
+#  month c3.
+#
+#  and click on Submit Commands.
+#  
+###########################################################################
+#
+#  Neither Minitab, Inc. nor the author(s) of this MACRO makes any claim 
+#  of or offers any Warranty whatsoever with regard to the accuracy of 
+#  this MACRO or its suitability for use.  Minitab, Inc. and the author(s)
+#  of this MACRO each hereby disclaims any Warranty and/or liability with 
+#  respect thereto. 
+#
+###########################################################################
+
+fiscal a bqy;
+ start b1;
+ month bmon.
+
+mcolumn a amon aday ayear b bmon byear nbmon bquar bqy
+mconstant diff acount i b1 d e
+default b1=7
+
+dtype a e
+dtype b1 d
+
+if e = 3
+  if d=2
+    if b1>0 and b1<13
+      numeric a amon;
+        month.
+      numeric a aday;
+        day.
+      numeric a ayear;
+        year.
+      let acount=count(a)
+
+      do i=1:acount
+        if amon[i]=b1
+          let bmon[i]=1
+          let byear[i]=ayear[i] +1
+        elseif amon[i] > b1
+          let bmon[i]=amon[i] - b1 + 1
+          let byear[i]=ayear[i] +1
+        else amon[i] < b1
+          let nbmon[i]=b1 -amon[i] -1
+          let bmon[i]= 12 - nbmon[i] 
+          let byear[i]=ayear[i]
+        endif
+      enddo
+
+      Code (1:3) "Q1  - " (4:6) "Q2  - " (7:9) "Q3  - " (10:12) "Q4  - " bmon bquar
+      text byear byear;
+        maxwidth 80.
+      concat bquar byear bqy
+      name bqy "Fiscal Q-Y" bmon "Fiscal Month"
+    else 
+      note
+      Note       *** Error: Starting Month must be an integer between 1 - 12
+    endif
+    else 
+     note
+     Note       *** Error: Starting Month must be be an integer
+  endif
+  else 
+    note
+    note       *** Error:  Column is not in Date Format
+endif
+endmacro

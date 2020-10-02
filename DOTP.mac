@@ -1,0 +1,1419 @@
+macro
+###########################################################################
+#
+#    Macro: DOTP.MAC
+#     Date: October 1999, updated September 2004
+#   Author: Nick Bolgiano, Steve Orlich 
+#  Version: Minitab 18
+#
+#  This macro creates a dotplot for each input variable and plots the 
+#  median, Q1, and Q3. There is an option to plot the mean, and 
+#  (mean + - 1 stdev) instead. If multiple input variables are given, the 
+#  default is to produce a dotplot for each variable in separate graph 
+#  windows. There is an option put all the dotplots in a single graph 
+#  window. The data can be arranged in the worksheet in one of two ways: 
+#  with a By variable defining the groups (stacked data) or with each 
+#  group entered into a single column (unstacked data). The response 
+#  variable accepts numeric data only. The group column can be numeric, 
+#  text, or date/time.  
+#  
+#  Suppose you have data in C1 and a grouping variable in C2.  To create a 
+#  dotplot for each group, choose Edit > Command Line Editor... and type 
+#  the command
+#
+#  %DOTP C1;
+#    BY C2.
+#
+#  Click on Submit Commands. 
+#
+#  If you want to plot the mean and (mean +- stdev) instead of the median, 
+#  Q1 and Q3, choose Edit > Command Line Editor and type the commands
+#
+#  %DOTP C1;
+#    BY C2;
+#    OPTION 2.
+#  
+#  Click on Submit Commands. 
+#
+#  Suppose your data is not stacked, but in C1, C2, and C3.  To create a 
+#  dotplot for each column, choose Edit > Commnad Line Editor and type the 
+#  commands
+#
+#  %DOTP C1 C2 C3
+#
+#  Click on Submit Commands. This will create each dotplot in a separate 
+#  graph window. To put all the dotplots in the same graph window, use the 
+#  commands
+#
+#  %DOTP C1 C2 C3;
+#    ONEPAGE.
+#  
+###########################################################################
+#
+#  Neither Minitab, Inc. nor the author(s) of this MACRO makes any claim 
+#  of or offers any Warranty whatsoever with regard to the accuracy of 
+#  this MACRO or its suitability for use.  Minitab, Inc. and the author(s)
+#  of this MACRO each hereby disclaims any Warranty and/or liability with 
+#  respect thereto. 
+#
+###########################################################################
+
+dotp dat.1-dat.k; 
+ by bycol;         #specify a BY column
+ title ttl;        #enter a title
+ onepage;          #regard multiple columns as BY groups
+ gsave fname;      #save graph to fname
+ size ssize;       #set symbol size (default 0.5)
+ option req.
+
+#################################
+###        declarations       ###
+#################################
+mcolumn dat.1-dat.k data ngroup sorted sd x bycol nbygrp &
+        bysort byd byids byvals maxy bydum binmid bylabels &
+        dots newby bygrplab dty med.1-med.k q1.1-q1.k q3.1-q3.k mean.1-mean.k stan.1-stan.k &
+        plus.1-plus.k minus.1-minus.k medone q1one stanone q3one
+
+mconstants fname ttl wttl.1-wttl.k vn1.1-vn1.k vn2 vn3 bylab p.1-p.k &
+           n.1-n.k cnt.1-cnt.k cntdat mind maxd grmin grmax dt.1-dt.k &
+           range incr mindist k j limit cntby countgrp brush dum ratio &
+           mindt maxdt ssize maxingrp i req f1 f2 lcolor.1-lcolor.2 lsize.1-lsize.2
+default fname=0  ssize=0.5 req=1 
+
+copy 2 4 lcolor.1-lcolor.2
+copy 5 3 lsize.1-lsize.2
+#################################
+###          main body        ###
+#################################
+mreset
+brief 0
+noecho
+notitle
+endmtitle
+
+################################
+#Set legend information
+
+IF req = 1
+ kkset f1 "Median"
+ kkset f2 "Q1,Q3"
+ELSE
+ kkset f1 "Mean"
+ kkset f2 "Mean +- 1 StDev"
+ENDIF
+
+################################
+
+###################################
+#check upfront for error conditions
+if onepage = 1 and by = 1
+   mtitle "Dotplot Macro Error";
+      notitle.
+   brief 2
+   print " ** Error ** ONEPAGE and BY cannot be used together;"
+   Print "                  execution aborted."
+   endmtitle
+   exit
+endif
+do j=1:k
+#check for data present
+n dat.j n.j
+count dat.j cnt.j
+if n.j = 0
+   mtitle "Dotplot Macro Error";
+     notitle. 
+   brief 2
+   print " ** Error ** No data in column; execution aborted."
+   endmtitle
+   exit
+endif
+#check if column lengths unequal with BY column 
+if by = 1
+ count bycol cntby
+ if cnt.j <> cntby 
+   mtitle "Dotplot Macro Error";
+     notitle.
+   brief 2
+   print " ** Error ** Response columns must be the same length"
+   print "                  as the BY column; execution aborted."
+   endmtitle   
+   exit
+ endif
+endif
+#copy names for plotdot5 labels when onepage=1
+kkname p.j dat.j
+#check data types: exit if text or date/time
+dtype dat.j dt.j
+if dt.j=0 | dt.j=3
+   mtitle "Dotplot Macro Error";
+     notitle.
+   brief 2
+   print " ** Error ** Data must be numeric; execution aborted."
+   endmtitle
+   exit
+endif
+enddo
+
+#check for ONEPAGE and mixed numeric, date/time data
+copy dt.1-dt.k dty
+min dty mindt
+max dty maxdt
+if onepage=1
+ if (mindt = 1 | mindt = 2) & maxdt=3
+   mtitle "Dotplot Macro Error";
+     notitle.
+   brief 2
+   print " ** Error ** Cannot mix numeric and date/time data on"
+   print "                same graph; execution aborted."
+   endmtitle
+   exit
+ endif
+endif
+#initialize part of title, graph wtitle
+  kkset vn2 'Dotplot for '
+  if onepage = 1
+   kkname vn1.1 dat.1
+   if k = 1
+    kkcat vn2 vn1.j wttl.1
+   else
+    kkname vn1.k dat.k
+    kkset vn3 '-'
+    kkcat vn2 vn1.1 wttl.1
+    kkcat wttl.1 vn3 wttl.1
+    kkcat wttl.1 vn1.k wttl.1
+   endif
+   if title = 0
+    copy wttl.1 ttl
+   endif
+  endif
+###################################
+#if data are unstacked but want BY dotplot, then stack data
+
+if onepage = 1
+if k > 1
+ stack dat.1-dat.k data
+else
+ copy dat.1 data
+endif
+count data cntdat
+copy 0 bycol
+do j=1:k
+ count dat.j dum
+ set bydum
+ dum(j)
+ end
+ stack bycol bydum bycol
+enddo
+
+dele 1 bycol
+	IF req = 1
+	  	  stat data;
+		   by bycol;
+                   median medone;
+                   qone q1one;
+		   qthree q3one.
+	ELSE
+	  	  stat data;
+                   by bycol;
+                   mean medone;
+                   stdev stanone.
+		  let q1one = medone - stanone
+		  let q3one = medone + stanone
+	ENDIF
+endif
+#
+#now cycle through data columns creating a dotplot for each
+do j=1:k
+IF by = 1
+	IF req = 1
+	  	  stat dat.j;
+	    	   by bycol;
+                   median med.j;
+                   qone q1.j;
+		   qthree q3.j.
+	ELSE
+	  	  stat dat.j;
+	    	   by bycol;
+                   mean med.j;
+                   stdev stan.j.
+		  let q1.j = med.j - stan.j
+		  let q3.j = med.j + stan.j
+	ENDIF
+ELSE
+	IF req = 1
+	  	  stat dat.j;
+                   median med.j;
+                   qone q1.j;
+		   qthree q3.j.
+	ELSE
+	  	  stat dat.j;
+                   mean med.j;
+                   stdev stan.j.
+		  let q1.j = med.j - stan.j
+		  let q3.j = med.j + stan.j
+	ENDIF
+ENDIF
+
+if by = 1
+ stat;
+  by bycol;
+  gids byids;
+  gval byvals;
+  counts nbygrp;
+  missing.
+ count nbygrp countgrp
+ max nbygrp maxingrp
+endif
+
+#initialize wtitle, axis labels if none entered
+  kkname vn1.j dat.j
+  if onepage = 0
+   kkcat vn2 vn1.j wttl.j
+   if title = 0
+    copy wttl.j ttl
+   endif
+  endif
+
+if onepage = 0
+ copy dat.j data
+ copy cnt.j cntdat
+endif
+if onepage = 0 and by = 0
+set bycol
+cnt.j(1)
+end
+copy cnt.j maxingrp
+if k=1 and maxingrp=1
+   mtitle "Dotplot Macro Error";
+      notitle.
+   brief 2
+   print " ** Error ** Need more than one observation; "
+   print "             execution aborted."
+   endmtitle
+   exit
+endif
+endif
+
+#first calculate number of each observation
+copy 100 limit
+if cntdat > 100
+ copy cntdat limit
+endif
+#sublimits limit
+stat;
+ by data;
+ counts ngroup.
+############################################
+#check if data resolution too fine (min distance apart <.01 of data range)
+#set up bins 
+min data mind
+max data maxd
+gscale mind maxd;
+ smin grmin;
+ smax grmax.
+subt grmin grmax range
+mult 0.010 range incr
+
+if onepage
+ stat;
+  by bycol;
+  count nbygrp;
+  missing.
+  max nbygrp maxingrp
+endif
+
+if maxingrp >1
+if by = 0
+ sort dat.j sorted
+ diff sorted sd
+set bysort
+cntdat(1)
+end
+ if onepage = 0
+  copy 1 countgrp
+ else
+  copy k countgrp
+ endif
+else
+ convert byvals byids bycol bysort
+ sort data bysort sorted bysort;
+   by bysort data.
+  diffs sorted sd
+  diffs bysort byd
+  copy sd sd;
+   use byd=0.
+endif 
+
+ copy sd sd;
+  omit sd=0.
+ min sd mindist
+else
+ mult 2 incr mindist
+endif
+#############################################
+
+#bin the data, get counts/bin
+call binning data bycol k ngroup byvals binmid x maxy mindist grmin grmax &
+             incr brush
+################################################
+#continue and make graph
+#do a brushable graph if all dots fit
+ if brush = 1 
+  if onepage = 0
+
+   call plotdot3 dat.j bycol ngroup binmid cnt.j countgrp maxy incr &
+                 gsave fname wttl.j ttl vn1.j ssize med.j q1.j q3.j f1 f2 &
+                 lcolor.1-lcolor.2 lsize.1-lsize.2
+  else
+   call plotdot4 dat.1-dat.k bycol ngroup binmid maxy incr &
+                 gsave fname wttl.j ttl vn1.j ssize medone q1one q3one f1 f2 &
+                 lcolor.1-lcolor.2 lsize.1-lsize.2
+  endif
+#do a nonbrushable graph if dots do not fit
+ elseif brush = 0
+  #set up axis and BY labels
+  if onepage = 1
+   kkset vn1.j ' '
+   kkset bylab ' '
+   copy p.1-p.k bygrplab
+  elseif by = 1
+   kkname bylab bycol
+   stat;
+    by bycol;
+    glab bygrplab;
+    missing.
+  else
+   kkset bylab ' '
+   copy bylab bygrplab
+  endif 
+#
+  call calcdot byvals ngroup x countgrp maxy dots sorted newby ratio
+
+IF onepage
+  copy medone med.1
+  copy q1one q1.1
+  copy q3one q3.1
+ENDIF
+
+ call plotdot5 dots sorted newby countgrp ratio bylabels incr &
+         gsave fname wttl.j ttl vn1.j bylab bygrplab ssize med.j q1.j q3.j f1 f2 &
+         lcolor.1-lcolor.2 lsize.1-lsize.2   
+
+ endif
+#
+######
+if onepage = 1
+ exit
+endif
+enddo
+
+endmacro
+
+###############################################################
+
+macro
+calcdot byvals ngroup x k maxy dots sorted newby ratio
+
+mcolumn   byvals ngroup x maxy dots sorted newby
+mconstant ratio ndist k
+ 
+mcolumn   CumSize Index Groups Offset
+mconstant ObsCt
+
+#mcolumn data bycol byvals ngroup x maxy dots sorted newby
+#mconstant k1 size ratio group ndist k countgrp 
+
+
+#adjust height of dots if exceeds capacity to be shown clearly
+let ratio=round(max(maxy)/60 + 0.4999)
+let ngroup=round(ngroup/ratio + 0.4999)
+
+sum ngroup ObsCt
+set dots
+1:ObsCt
+end
+
+count ngroup ndist
+let CumSize = pars(ngroup)
+set Index
+1:ndist
+end
+
+conv CumSize Index dots Groups
+lag Groups Groups
+let Groups = 1 + pars( Groups ne '*' )
+
+dele ndist CumSize
+stac 0 CumSize CumSize
+conv Index CumSize Groups Offset
+subt Offset dots dots
+
+conv Index x Groups sorted
+conv Index byvals Groups newby
+
+endmacro
+#############################################################
+
+macro
+binning data bycol k ngroup byvals binmid x maxy mindist grmin grmax incr brush
+mcolumn data ngroup x bins cats binmid bycol byvals maxy byvals2 ngroup2
+mconstant mindist grmin grmax incr begin end k1 k2 k brush size
+
+#if x resolution too fine, will bin
+#first bin x data if x resolution too fine
+if  mindist < incr 
+let begin=grmin-0.004*incr
+let end=grmax+0.004*incr
+set bins
+begin:end/incr
+end
+
+#check to see if bins span data
+max bins k1
+if k1 < end
+ add end incr k2
+ insert bins
+  k2
+ end
+endif
+min bins k1
+if k1 > begin
+ subt incr begin k2
+ insert 0 1 bins
+  k2
+ end
+endif
+#categorize data into bins
+cate data;
+ cutp bins;
+ cate cats;
+ midp binmid.
+#get x value, counts
+stat;
+  by bycol binmid;
+  gvals byvals x;
+  counts ngroup;
+  noempty;
+  missing.
+else
+#if resolution not too fine, simply tally count/obs
+#get x value, counts
+stat;
+ by bycol data;
+ gvals byvals x;
+ counts ngroup;
+ noempty;
+ missing.
+copy data binmid
+endif
+#now get max number of observations/bin for each by group
+#first omit counts with x of missing
+copy ngroup byvals ngroup2 byvals2;
+ omit x='*'.
+stat ngroup2;
+ by byvals2;
+ maximum maxy;
+ missing.
+#determine if graph points will represent 1 observation
+#(brush=1) or more than 1 observation (brush=0)
+let size = max(maxy)
+if size > 70 
+ copy 0 brush
+else
+ copy 1 brush
+endif
+
+endmacro
+
+##########################################
+macro
+plotdot3 data bycol ngroup binmid cnt k maxy incr &
+         gsave fname wttl ttl vn1 ssize med q1 q3 f1 f2 lcolor.1-lcolor.2 lsize.1-lsize.2
+mcolumn data bycol ngroup maxy dots rownums binmid st.1-st.k byvals &
+        bylabxp bylabyp bygrplab ydmin dum labchk tbycol byids first &
+        last te.1-te.3 ydmax pages diff maxs pagevals &
+        CumSize GroupId Groups Offset med q1 q3 full full1 number col1 &
+        shea.1-shea.50 temp
+mconstant cnt gsave fname wttl ttl vn1 ndist j m size s1 s2 d1 d2 k &
+          ydmi.1-ydmi.k ydma.1-ydma.k incr p.1-p.k ymax.1-ymax.k bypos &
+          bylab datxmin dtby index page.1-page.k f s t v ObsCt ssize many b i man &
+          refe.1-refe.3 f1 f2 lcolor.1-lcolor.2 lsize.1-lsize.2
+mmatrix m1
+
+################################################
+# Prepare to draw location statistics
+
+stat data;
+ by bycol;
+ gvals number.
+
+n number many
+let man = many-1
+
+stack med q1 q3 full;
+ subs full1.
+
+set col1
+3(0:man)
+end
+
+DO i = 1:many
+ let b = i-1
+ copy full shea.i;
+  use col1=b.
+ENDDO
+
+################################################
+
+sum ngroup ObsCt
+set dots
+1:ObsCt
+end
+
+count ngroup ndist
+Let CumSize = pars(ngroup)
+set GroupId
+1:ndist
+end
+
+conv CumSize GroupId dots Groups
+lag Groups Groups
+let Groups = 1 + pars( Groups ne '*' )
+
+dele ndist CumSize
+stac 0 CumSize CumSize
+conv GroupId CumSize Groups Offset
+subt Offset dots dots
+
+set rownums
+1:cnt
+end
+#
+dtype bycol dtby
+if dtby ~= 0
+ sort rownums rownums;
+  by bycol data.
+else
+ stat;
+  by bycol;
+  gval byvals;
+  gids byids;
+  missing.
+ convert byvals byids bycol tbycol
+ sort rownums rownums;
+  by tbycol data.
+endif
+sort dots dots;
+ by rownums.
+#
+#set up min and max for axes, symbol types
+set dum
+k(6)
+end
+diag dum m1
+copy m1 st.1-st.k
+let d1 = min(binmid)-3*incr
+let d2 = max(binmid)+3*incr
+copy 1 index
+copy 1 first
+copy k last
+#set up data regions, y max
+do j=1:k
+ if j = 1
+  copy .15 ydmi.j
+ else
+ let m=j-1
+ let ydmi.j = ydma.m + .04
+ endif
+ let ydma.j = ydmi.j + maxy(j)/100 + .02
+ let ymax.j=maxy(j)+1
+ if ydma.j > .9
+  let v=j-1
+  insert last
+   v
+  end
+  copy .15 ydmi.j
+  let ydma.j = ydmi.j + maxy(j)/100 + .02    
+  add 1 index index
+  insert first
+   j
+  end
+ endif 
+ copy index page.j
+enddo
+
+#if too much white space, move plots upward
+copy ydmi.1-ydmi.k ydmin
+copy ydma.1-ydma.k ydmax
+copy page.1-page.j pages
+stat ydmax;
+ by pages;
+ maxi maxs;
+ gval pagevals.
+conv pagevals maxs pages diff
+set temp
+k(0.6)
+end
+rmin temp diff diff
+subt diff .6 diff
+add diff ydmin ydmin
+add diff ydmax ydmax
+copy ydmin ydmi.1-ydmi.k
+copy ydmax ydma.1-ydma.k
+#
+#set up labels for BY groups
+set bylabxp
+k(.13)
+end
+add ydmin .02 bylabyp
+if k > 1
+  kkname bylab bycol
+  copy .15 datxmin
+ stat;
+  by bycol;
+  glab bygrplab;
+  missing.
+ text bygrplab bygrplab;
+  maxw 12.
+ copy bylab labchk
+ text labchk labchk;
+  maxw 12.
+ copy labchk bylab
+else
+  copy .1 datxmin
+  kkset bylab ' '
+  kkset m ' '
+  copy m bygrplab
+endif
+
+#remove any duplicates in col to identify last group on page
+stat;
+ by last;
+ gvals last.
+#############
+do m=1:page.k
+ #find first, second, and last groups for page
+ let f=first(m)
+ add f 1 s
+ let t=last(m)
+#set up BY groups, BY col label position for page
+add ydmi.t .08 bypos
+copy bylabxp ydmin bygrplab te.1-te.3; 
+ use f:t.
+#
+if gsave = 0
+layout;
+ wtitle wttl;
+ page;
+  type 0;
+ text .5 .97 ttl;
+  place 0 0;
+  tsize 1.25;
+  bold;
+ text .065 bypos bylab;
+  place 0 0;
+  tsize 1.1;
+ text te.1 te.2 te.3;
+  tsize 0.8;
+  place -1 1;
+ text 0.815 0.97 f1;
+ text 0.815 0.93 f2;
+ line 0.8 0.955 0.8 0.985;
+  color lcolor.1;
+  size lsize.1;
+ line 0.8 0.915 0.8 0.945;
+  color lcolor.2;
+  size lsize.2;
+.
+elseif gsave = 1
+layout;
+ wtitle wttl;
+ page;
+  type 0;
+ text .5 .97 ttl;
+  place 0 0;
+  tsize 1.25;
+  bold;
+ text .065 bypos bylab;
+  place 0 0;
+  tsize 1.1;
+ text te.1 te.2 te.3;
+  tsize .8;
+  place -1 1;
+ gsave fname;
+ text 0.815 0.97 f1;
+ text 0.815 0.93 f2;
+ line 0.8 0.955 0.8 0.985;
+  color lcolor.1;
+  size lsize.1;
+ line 0.8 0.915 0.8 0.945;
+  color lcolor.2;
+  size lsize.2;
+.
+endif
+
+copy shea.1 refe.1-refe.3		#Move line positions into constants
+
+plot dots*binmid;
+ nodtitle;
+ nolegend;
+ figure;
+  etype 0;
+ data datxmin .9 ydmi.f ydma.f;
+  etype 0;
+ symbol bycol;
+  type st.f;
+  size ssize;
+  color 16;
+ scale 2;
+  max ymax.f;
+  min 0;
+  ldis 0 0 0 0;
+  hdis 0 0 0 0;
+ scale 1;
+  hdis 0 0 0 0;
+  min d1;
+  max d2;
+ axlabe1 1 vn1;
+  tsize 1.1;
+ axlabel 2;
+  adisplay 0;
+ #tick 1;
+ # tsize 0.85;
+ # offset 0 -0.027;
+ line refe.1 0 refe.1 -2;
+  color lcolor.1;
+  size lsize.1;
+ line refe.2 0 refe.2 -2;
+  color lcolor.2;
+  size lsize.2;
+ line refe.3 0 refe.3 -2;
+  color lcolor.2;
+  size lsize.2;
+.
+if t > f
+ do j=s:t
+
+copy shea.j refe.1-refe.3		#Move line positions into constants
+
+  plot dots*binmid;
+   nodtitle;
+   nolegend;
+   data datxmin .9 ydmi.j ydma.j;
+    etype 0;
+   scale 2;
+    max ymax.j;
+    min 0;
+    ldis 0 0 0 0;
+    hdis 0 0 0 0;
+   scale 1;
+    hdis 0 0 0 0;
+    min d1;
+    max d2;
+    ldis 1 1 0 0;
+   axlabel 2;
+    adisplay 0;
+   symbol bycol;
+    type st.j;
+    size ssize;
+    color 16;
+   axlabel 1;
+    adisplay 0;
+   line refe.1 0 refe.1 -2;
+    color lcolor.1;
+    size lsize.1;
+   line refe.2 0 refe.2 -2;
+    color lcolor.2;
+    size lsize.2;
+   line refe.3 0 refe.3 -2;
+    color lcolor.2;
+    size lsize.2;
+.
+ enddo
+endif
+endlayout
+enddo
+endmacro
+##########################################
+macro
+plotdot4 dat.1-dat.k bycol ngroup binmid maxy incr &
+         gsave fname wttl ttl vn1 ssize medone q1one q3one f1 f2 lcolor.1-lcolor.2 lsize.1-lsize.2
+mcolumn dat.1-dat.k binmid maxy dots rownums colxp colyp colname ngroup &
+        xval.1-xval.k yval.1-yval.k bycol first last te.1-te.3 &
+        CumSize GroupId Groups Offset ydmax ydmin pages diff maxs pagevals data &
+        number medone q1one q3one full full1 col1 shea.1-shea.50 temp
+mconstant cnt gsave fname wttl ttl vn1 ndist j m size d1 d2 k incr &
+          ydmi.1-ydmi.k p.1-p.k ydma.1-ydma.k ymax.1-ymax.k index &
+          page.1-page.k f s t v ObsCt ssize many man b i refe.1-refe.3 f1 f2 &
+          lcolor.1-lcolor.2 lsize.1-lsize.2
+
+################################################
+# Prepare to draw location statistics
+
+stack dat.1-dat.k data
+stat data;
+ by bycol;
+ gvals number.
+
+n number many
+let man = many-1
+
+stack medone q1one q3one full;
+ subs full1.
+
+set col1
+3(0:man)
+end
+
+DO i = 1:many
+
+ let b = i-1
+
+ copy full shea.i;
+  use col1 = b.
+
+ENDDO
+
+################################################
+
+sum ngroup ObsCt
+set dots
+1:ObsCt
+end
+
+count ngroup ndist
+let Cumsize = pars(ngroup)
+set GroupId
+1:ndist
+end
+
+conv CumSize GroupId dots Groups
+lag Groups Groups
+let Groups = 1 + pars( Groups ne '*' )
+
+dele ndist CumSize
+stac 0 CumSize CumSize
+conv GroupId CumSize Groups Offset
+subt Offset dots dots
+
+if k > 1
+ unstack dots yval.1-yval.k;
+  subs bycol.
+ unstack binmid xval.1-xval.k;
+  subs bycol.
+else
+ copy dots binmid yval.1 xval.1
+endif
+
+#set up x min and max for axes
+let d1 = min(binmid)-3*incr
+let d2 = max(binmid)+3*incr
+
+copy 1 index
+copy 1 first
+copy k last
+#set up data regions
+ do j=1:k
+ if j = 1
+  let ydmi.j=.15
+ else
+ let m=j-1
+ let ydmi.j = ydma.m + .04
+ endif
+ let ydma.j = ydmi.j + maxy(j)/100 + .02
+ let ymax.j=maxy(j)+1
+ if ydma.j > .9
+  let v=j-1
+  insert last
+   v
+  end
+  copy .15 ydmi.j
+  let ydma.j = ydmi.j + maxy(j)/100 + .02    
+  add 1 index index
+  insert first
+   j
+  end
+ endif 
+ copy index page.j
+ kkname p.j dat.j
+ enddo
+#
+#if too much white space, move plots upward
+copy ydmi.1-ydmi.k ydmin
+copy ydma.1-ydma.k ydmax
+copy page.1-page.j pages
+stat ydmax;
+ by pages;
+ maxi maxs;
+ gval pagevals.
+conv pagevals maxs pages diff
+set temp
+k(0.6)
+end
+rmin temp diff diff
+subt diff .6 diff
+add diff ydmin ydmin
+add diff ydmax ydmax
+copy ydmin ydmi.1-ydmi.k
+copy ydmax ydma.1-ydma.k
+#
+#set up labels for columns
+set colxp
+k(.13)
+end
+copy ydmi.1-ydmi.j colyp
+copy p.1-p.k colname
+text colname colname;
+ maxw 12.
+
+#############
+#remove any duplicates in col to identify last group on page
+stat;
+ by last;
+ gvals last.
+
+do m=1:page.k
+ #find first, second, and last groups for page
+ let f=first(m)
+ add f 1 s
+ let t=last(m)
+#set up data col label position for page
+copy colxp colyp colname te.1-te.3; 
+ use f:t.
+#
+if gsave = 0
+layout;
+ wtitle wttl;
+ page;
+  type 0;
+ text .5 .97 ttl;
+  place 0 0;
+  tsize 1.25;
+  bold;
+ text te.1 te.2 te.3;
+  tsize 0.8;
+  place -1 1;
+ text 0.815 0.97 f1;
+ text 0.815 0.93 f2;
+ line 0.8 0.955 0.8 0.985;
+  color lcolor.1;
+  size lsize.1;
+ line 0.8 0.915 0.8 0.945;
+  color lcolor.2;
+  size lsize.2;
+.
+elseif gsave = 1
+layout;
+ wtitle wttl;
+ page;
+  type 0;
+ text .5 .97 ttl;
+  place 0 0;
+  tsize 1.25;
+  bold;
+ text te.1 te.2 te.3;
+  tsize .8;
+  place -1 1;
+ gsave fname;
+ text 0.815 0.97 f1;
+ text 0.815 0.93 f2;
+ line 0.8 0.955 0.8 0.985;
+  color lcolor.1;
+  size lsize.1;
+ line 0.8 0.915 0.8 0.945;
+  color lcolor.2;
+  size lsize.2;
+.
+endif
+count dat.f cnt
+set rownums
+1:cnt
+end
+sort rownums rownums;
+ by dat.f.
+sort yval.f yval.f;
+ by rownums.
+
+copy shea.1 refe.1-refe.3		#Move line positions into constants
+
+plot yval.f*xval.f;
+ nodtitle;
+ nolegend;
+ figure;
+  etype 0;
+ data .15 .9 ydmi.f ydma.f;
+  etype 0;
+ symbol;
+  type 6;
+  size ssize;
+  color 16;
+ scale 2;
+  max ymax.f;
+  min 0;
+  ldis 0 0 0 0;
+  hdis 0 0 0 0;
+ scale 1;
+  min d1;
+  max d2;
+  hdis 0 0 0 0;
+ axlabel 1;
+  adisplay 0;
+ axlabel 2;
+  adisplay 0;
+ line refe.1 0 refe.1 -2;
+  color lcolor.1;
+  size lsize.1;
+ line refe.2 0 refe.2 -2;
+  color lcolor.2;
+  size lsize.2;
+ line refe.3 0 refe.3 -2;
+  color lcolor.2;
+  size lsize.2;
+.
+
+if t > f
+do j=s:t
+
+copy shea.j refe.1-refe.3		#Move line positions into constants
+
+count dat.j cnt
+set rownums
+1:cnt
+end
+sort rownums rownums;
+ by dat.j.
+sort yval.j yval.j;
+ by rownums.
+plot yval.j*xval.j;
+ nodtitle;
+ nolegend;
+ figure;
+  etype 0;
+ data .15 .9 ydmi.j ydma.j;
+  etype 0;
+  noclip;
+ symbol;
+  type 6;
+  size ssize;
+  color 16;
+ scale 2;
+  max ymax.j;
+  min 0;
+  ldis 0 0 0 0;
+  hdis 0 0 0 0;
+ scale 1;
+  min d1;
+  max d2;
+  hdis 0 0 0 0;
+  ldis 1 1 0 0;
+ axlabel 1;
+  adisplay 0;
+ axlabel 2;
+  adisplay 0;
+ line refe.1 0 refe.1 -2;
+  color lcolor.1;
+  size lsize.1;
+ line refe.2 0 refe.2 -2;
+  color lcolor.2;
+  size lsize.2;
+ line refe.3 0 refe.3 -2;
+  color lcolor.2;
+  size lsize.2;
+.
+enddo
+endif
+endlayout
+enddo
+endmacro
+##########################################
+macro
+plotdot5 dots sorted newby k ratio bylabels incr &
+         gsave fname wttl ttl vn1 bylab bygrplab ssize med q1 q3 &
+         f1 f2 lcolor.1-lcolor.2 lsize.1-lsize.2
+mcolumn dots sorted newby bylabels m1 m2 m3 m4 yval.1-yval.k xval.1-xval.k &
+        first last index bylabyp bylabxp bygrplab te.1-te.3 maxy labchk &
+        ydmin ydmax pages diff maxs pagevals med q1 q3 number full full1 &
+        col1 shea.1-shea.50 temp
+mconstant k gsave fname wttl ttl vn1 ratio footer ydmi.1-ydmi.k &
+          ydma.1-ydma.k datxmin ymax.1-ymax.k page.1-page.k m v j f s t &
+          bypos d1 d2 incr bylab ssize many man i b refe.1-refe.3 &
+          f1 f2 lcolor.1-lcolor.2 lsize.1-lsize.2
+
+################################################
+# Prepare to draw location statistics
+
+stat sorted;
+ by newby;
+ gvals number.
+
+n number many
+let man = many-1
+
+stack med q1 q3 full;
+ subs full1.
+
+set col1
+3(0:man)
+end
+
+DO i = 1:many
+
+ let b = i-1
+
+ copy full shea.i;
+  use col1=b.
+
+ENDDO
+
+################################################
+
+#adjust height of dots if exceeds capacity to be shown clearly
+#Set up footnote for adjustment to dot height
+copy ratio m2
+text m2 m2
+read m1 m3;
+ format(a26,a14).
+Each dot represents up to  observations.
+end
+concatenate m1 m2 m3 m4
+copy m4 footer
+#
+#omit x of missing
+copy dots sorted newby dots sorted newby;
+ omit sorted='*'.
+#copy data into separate columns for each BY group
+let d1=min(sorted)-3*incr
+let d2=max(sorted)+3*incr
+stat dots;
+ by newby;
+ maxi maxy;
+ missing.
+if k > 1
+ unstack dots yval.1-yval.k;
+  subs newby.
+ unstack sorted xval.1-xval.k;
+  subs newby.
+else
+ copy dots yval.1
+ copy sorted xval.1
+endif
+#
+#set up data regions, y max
+copy 1 index
+copy 1 first
+copy k last
+do j=1:k
+ max yval.j ymax.j
+ if j = 1
+  copy .15 ydmi.j
+ else
+ let m=j-1
+ let ydmi.j = ydma.m + .04
+ endif
+ let ydma.j = ydmi.j + maxy(j)/100 + .02
+ if ydma.j > .9
+  let v=j-1
+  insert last
+   v
+  end
+  copy .15 ydmi.j
+  let ydma.j = ydmi.j + maxy(j)/100 + .02    
+  add 1 index index
+  insert first 
+   j
+  end
+ endif 
+ copy index page.j
+ add 1 ymax.j ymax.j
+# kkname p.j dat.j
+enddo
+#
+#if too much white space, move plots upward
+copy ydmi.1-ydmi.k ydmin
+copy ydma.1-ydma.k ydmax
+copy page.1-page.j pages
+stat ydmax;
+ by pages;
+ maxi maxs;
+ gval pagevals.
+conv pagevals maxs pages diff
+set temp
+k(0.6)
+end
+rmin temp diff diff
+subt diff .6 diff
+add diff ydmin ydmin
+add diff ydmax ydmax
+copy ydmin ydmi.1-ydmi.k
+copy ydmax ydma.1-ydma.k
+#
+#set up labels for BY groups
+set bylabxp
+k(.13)
+end
+copy ydmi.1-ydmi.k bylabyp
+add bylabyp .02 bylabyp
+if k > 1
+  copy .15 datxmin
+ text bygrplab bygrplab;
+  maxw 12.
+ copy bylab labchk
+ text labchk labchk;
+  maxw 12.
+ copy labchk bylab
+else
+  copy .1 datxmin
+endif
+
+#remove any duplicates in col to identify last group on page
+stat;
+ by last;
+ gvals last.
+#############
+do m=1:page.k
+ #find first, second, and last groups for page
+ let f=first(m)
+ add f 1 s
+ let t=last(m)
+#set up BY groups, BY col label position for page
+add ydmi.t .08 bypos
+copy bylabxp bylabyp bygrplab te.1-te.3; 
+ use f:t.
+
+#
+if gsave = 0
+layout;
+ wtitle wttl;
+ page;
+  type 0;
+ text .5 .97 ttl;
+  place 0 0;
+  tsize 1.25;
+  bold;
+ text .065 bypos bylab;
+  place 0 0;
+  tsize 1.1;
+ text te.1 te.2 te.3;
+  tsize 0.8;
+  place -1 1;
+ text 0.815 0.97 f1;
+ text 0.815 0.93 f2;
+ line 0.8 0.955 0.8 0.985;
+  color lcolor.1;
+  size lsize.1;
+ line 0.8 0.915 0.8 0.945;
+  color lcolor.2;
+  size lsize.2;
+.
+elseif gsave = 1
+layout;
+ wtitle wttl;
+ page;
+  type 0;
+ text .5 .97 ttl;
+  place 0 0;
+  tsize 1.25;
+  bold;
+ gsave fname;
+ text .065 bypos bylab;
+  place 0 0;
+  tsize 1.1;
+ text te.1 te.2 te.3;
+#  tsize .8;
+  place -1 1;
+ text 0.815 0.97 f1;
+ text 0.815 0.93 f2;
+ line 0.8 0.955 0.8 0.985;
+  color lcolor.1;
+  size lsize.1;
+ line 0.8 0.915 0.8 0.945;
+  color lcolor.2;
+  size lsize.2;
+.
+endif
+
+copy shea.m refe.1-refe.3		#Move line positions into constants
+
+plot yval.f*xval.f;
+ nodtitle;
+ nobrush;
+ figure;
+  etype 0;
+ data datxmin .9 ydmi.f ydma.f;
+  etype 0;
+ symbol;
+  type 6;
+  size ssize;
+  color 16;
+ scale 2;
+  max ymax.f;
+  min 0;
+  ldis 1 0 0 0;
+  hdis 0 0 0 0;
+ scale 1;
+  hdis 0 0 0 0;
+  min d1;
+  max d2;
+ foot footer;
+  tsize 0.9;
+ axlabe 1 vn1;
+  tsize 1.1;
+ axlabel 2;
+  adis 0;
+ #tick 1;
+ # tsize 0.85;
+ # offset 0 -0.027;
+ line refe.1 0 refe.1 -2;
+  color lcolor.1;
+  size lsize.1;
+ line refe.2 0 refe.2 -2;
+  color lcolor.2;
+  size lsize.2;
+ line refe.3 0 refe.3 -2;
+  color lcolor.2;
+  size lsize.2;
+.
+if t > f
+ do j=s:t
+
+copy shea.j refe.1-refe.3		#Move line positions into constants
+
+plot yval.j*xval.j;
+ nobrush;
+ nodtitle;
+ nolegend;
+ figure;
+  etype 0;
+ data .15 .9 ydmi.j ydma.j;
+  etype 0;
+ symbol;
+  type 6;
+  size ssize;
+  color 16;
+ scale 2;
+  ldis 0 0 0 0;
+  hdis 0 0 0 0;
+  max ymax.j;
+  min 0;
+ scale 1;
+  hdis 0 0 0 0;
+  min d1;
+  max d2;
+  ldis 1 1 0 0;
+ axlabel 1;
+  adis 0;
+ line refe.1 0 refe.1 -2;
+  color lcolor.1;
+  size lsize.1;
+ line refe.2 0 refe.2 -2;
+  color lcolor.2;
+  size lsize.2;
+ line refe.3 0 refe.3 -2;
+  color lcolor.2;
+  size lsize.2.
+enddo
+endif
+endlayout
+enddo
+endmacro
+###################################################################

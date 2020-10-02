@@ -1,0 +1,398 @@
+GMACRO
+CLT
+#     Name:  CLT.MAC
+#   Author:  Terry Ziemer
+#  Version:  Minitab 18
+#
+###########################################################################
+#
+#  Neither Minitab, Inc. nor the author(s) of this MACRO makes any claim 
+#  of or offers any Warranty whatsoever with regard to the accuracy of 
+#  this MACRO or its suitability for use.  Minitab, Inc. and the author(s)
+#  of this MACRO each hereby disclaims any Warranty and/or liability with 
+#  respect thereto. 
+#
+###########################################################################
+mreset
+noecho
+notitle
+brief 0
+endmtitle
+
+mtitle "Central Limit Theorem Demonstration";
+  notitle.
+brief 2
+note
+note
+note     The Central Limit Theorem states that if random samples of size n 
+note     are repeatedly drawn from a population with a finite mean, mu(y), and 
+note     standard deviation, sigma(y), then when n is large, the distribution
+note     of the sample means will be approximately normal with mean equal to 
+note     mu(y), and standard deviation equal to (sigma(y))/sqrt(n). 
+note
+note     Graph 1:  
+note     Let's examine the effects of the Central Limit Theorem with the 
+note     following experiment.  Suppose we toss a fair die 1000 times. We 
+note     would expect to get about an equal number of 1's, 2's, etc. Let's 
+note     look at the distribution of 1000 tosses.  This is illustrated in Graph 1.
+note
+brief 0
+copy .5 .5 1.5 1.5 1.5 2.5 2.5 2.5 3.5 3.5 3.5 4.5 4.5 4.5 5.5 5.5 5.5 6.5 6.5 c101 
+copy 0 178 178 0 166 166 0 156 156 0 175 175 0 175 175 0 150 150 0 c102 
+plot c102 * c101; 
+   symbol; 
+      type 0; 
+   lines c101 c102; 
+   wtitle 'Graph 1:  1000 Tosses of a Fair Die';
+   title 'Distribution of 1000 Tosses of a Fair Die';
+   scale 1;
+     ticks 1:6;
+   scale 2;
+     minimum 0; 
+     maximum 300; 
+   footnote 'Graph 1'; 
+   axlabel 2 'Occurrences'; 
+   axlabel 1 'Value of Die'.
+gpause 4
+
+brief 2
+note 
+note     Graph 2:
+note     Now suppose we were to toss the die two times and take the 
+note     average of the two tosses.  We will repeat this experiment 1000 
+note     times also.  Let's see what the distribution of the averages 
+note     of two tosses looks like.  This is illustrated in Graph 2. 
+note
+brief 0
+set c120 
+.75 .75 1.25 1.25 1.25 1.75 1.75 1.75 2.25 2.25 2.25 2.75 2.75 2.75 
+3.25 3.25 3.25 3.75 3.75 3.75 4.25 4.25 4.25 4.75 4.75 4.75 
+5.25 5.25 5.25 5.75 5.75 5.75 6.25 6.25 
+end
+set c106 
+0 39 39 0 46 46 0 90 90 0 91 91 0 142 142 0 150 150 0 139 139 0 
+133 133 0 86 86 0 56 56 0 28 28 0 
+end
+set c103 
+.5:6.5/.030150753 
+end
+pdf c103 c104; 
+normal 3.5 1.20761. 
+let c104 = 500*c104 
+plot c104*c103; 
+   symbol; 
+      type 0; 
+   wtitle 'Graph 2: 1000 Averages of 2 Tosses of a Fair Die'; 
+   title 'Distribution of 1000 Averages of'; 
+   title '   Two Tosses of a Fair Die     ';
+   scale 1;
+     ticks 1:6;
+   scale 2;
+     minimum 0; 
+     maximum 300; 
+   footnote 'Graph 2'; 
+   lines c103 c104; 
+      type 1; 
+      color 4; 
+   lines c120 c106; 
+      type 1; 
+      color 2; 
+   axlabel 2 'Occurrences'; 
+   axlabel 1 'Value of Average'. 
+gpause 4
+
+brief 2
+note
+note     Graph 3: 
+note     Did you notice that with only two tosses the distribution of 
+note     the averages was already becoming mound-shaped? 
+note 
+note     Suppose that we now toss the die three times and take the 
+note     average of the three tosses.  Again, we will repeat this 
+note     experiment 1000 times.  Let's see what happens to the distribution 
+note     of the averages.  This is illustrated in Graph 3. 
+note 
+brief 0
+set c107 
+.825 .825 1.175 1.175 1.175 1.525 1.525 1.525 1.875 1.875 1.875 
+2.225 2.225 2.225 2.575 2.575 2.575 2.925 2.925 2.925 3.275 3.275 3.275 
+3.625 3.625 3.625 3.975 3.975 3.975 4.325 4.325 4.325 4.675 4.675 4.675 
+5.025 5.025 5.025 5.375 5.375 5.375 5.725 5.725 5.725 6.075 6.075 
+end
+set c108 
+0 6 6 0 14 14 0 23 23 0 34 34 0 51 51 0 95 95 0 117 117 0 273 273 0 
+116 116 0 107 107 0 83 83 0 42 42 0 20 20 0 14 14 0 5 5 0 
+end
+pdf c103 c104; 
+normal 3.5 .986013. 
+let c104 = 350*c104 
+plot c104*c103; 
+   symbol; 
+      type 0; 
+   wtitle 'Graph 3: 1000 Averages of 3 Tosses of a Fair Die';
+   title 'Distribution of 1000 Averages of'; 
+   title '  Three Tosses of a Fair Die    '; 
+   footnote 'Graph 3';
+   scale 1;
+     ticks 1:6;
+   scale 2;
+     minimum 0; 
+     maximum 300; 
+   lines c103 c104; 
+      type 1; 
+      color 4; 
+   lines c107 c108; 
+      type 1; 
+      color 2; 
+   axlabel 2 'Occurrences'; 
+   axlabel 1 'Value of Average'.
+gpause 4
+brief 2
+note 
+note     Graph 4:
+note     Again, the shape of the distribution is quite close to that of 
+note     a normal distribution.  Did you notice anything else that was 
+note     happening to the distribution? 
+note 
+note     Let's toss the die five times and take the average.  Again, we 
+note     will repeat this experiment 1000 times.  This is  
+note     illustrated in Graph 4. 
+note 
+brief 0
+
+set c109 
+1 1 1.4 1.4 1.4 1.8 1.8 1.8 2.2 2.2 2.2 2.6 2.6 2.6 3 3 3 3.4 3.4 3.4 
+3.8 3.8 3.8 4.2 4.2 4.2 4.6 4.6 4.6 5 5 5 5.4 5.4 5.4 5.8 5.8 
+end
+set c110 
+0 1 1 0 5 5 0 22 22 0 73 73 0 130 130 0 176 176 0 214 214 0 178 178 0 
+105 105 0 62 62 0 27 27 0 7 7 0 
+end
+pdf c103 c104; 
+normal 3.5 .763763. 
+let c104 = 400*c104 
+plot c104*c103; 
+   symbol ; 
+    type 0; 
+   wtitle 'Graph 4: 1000 Averages of 5 Tosses of a Fair Die'; 
+   title 'Distribution of 1000 Averages of'; 
+   title '   Five Tosses of a Fair Die    '; 
+   footnote 'Graph 4';
+   scale 1;
+     ticks 1:6;
+   scale 2;
+     minimum 0; 
+     maximum 300; 
+   lines c103 c104; 
+      type 1; 
+      color 4; 
+   lines c109 c110; 
+      type 1; 
+      color 2; 
+   axlabel 2 'Occurrences'; 
+   axlabel 1 'Value of Average'.
+gpause 4
+
+brief 2
+note 
+note     Graph 5:
+note     Have you begun to notice any patterns in what is happening yet? 
+note 
+note     Let's continue to increase the number of tosses that we are 
+note     averaging.  This time we will toss the die 10 times and take the 
+note     average of the 10 tosses.  This is illustrated in Graph 5. 
+note 
+brief 0
+gpause 4
+set c111 
+1.65 1.65 1.95 1.95 1.95 2.25 2.25 2.25 2.55 2.55 2.55 2.85 2.85 2.85 
+3.15 3.15 3.15 3.45 3.45 3.45 3.75 3.75 3.75 4.05 4.05 4.05 4.35 4.35 
+4.35 4.65 4.65 4.65 4.95 4.95 4.95 5.25 5.25 
+end
+set c112 
+0 3 3 0 6 6 0 17 17 0 80 80 0 153 153 0 197 197 0 219 219 0 
+173 173 0 95 95 0 42 42 0 13 13 0 2 2 0 
+end
+pdf c103 c104; 
+normal 3.5 .540062. 
+let c104 = 300*c104 
+plot c104*c103; 
+   symbol ; 
+      type 0; 
+   wtitle 'Graph 5: 1000 Averages of 10 Tosses of a Fair Die'; 
+   title 'Distribution of 1000 Averages of'; 
+   title '    Ten Tosses of a Fair Die    '; 
+   footnote 'Graph 5';
+   scale 1;
+     ticks 1:6;
+   scale 2;
+     minimum 0; 
+     maximum 300; 
+   lines c103 c104; 
+      type 1; 
+      color 4; 
+   lines c111 c112; 
+      type 1; 
+      color 2; 
+   axlabel 2 'Occurrences'; 
+   axlabel 1 'Value of Average'.
+gpause 4
+
+brief 2
+note 
+note    Graph 6:
+note     By now I think it is safe to say that we should be observing 
+note     two phenomena as we increase the number of tosses. 
+note 
+note     First, we should be observing that the shape of the distribution 
+note     of averages is really beginning to take on the shape of a normal 
+note     distribution. 
+note 
+note     Second, we should be observing that as the number of tosses 
+note     increases, the distribution becomes narrower and narrower. 
+note 
+note     Let's continue increasing the number of tosses.  This time we will 
+note     toss the die 20 times.  This is illustrated in Graph 6. 
+note 
+brief 0
+gpause 4
+set c113 
+1.875 1.875 2.125 2.125 2.125 2.375 2.375 2.375 2.625 2.625 2.625 2.875 2.875 
+2.875 3.125 3.125 3.125 3.375 3.375 3.375 3.625 3.625 3.625 3.875 3.875 3.875 
+4.125 4.125 4.125 4.375 4.375 4.375 4.625 4.625 4.625 4.875 4.875 
+end
+set c114 
+0 1 1 0 1 1 0 11 11 0 41 41 0 114 114 0 185 185 0 262 262 0 219 219 0 
+108 108 0 44 44 0 12 12 0 2 2 0 
+end
+pdf c103 c104; 
+normal 3.5 .38188. 
+let c104 = 250*c104 
+plot c104*c103; 
+   symbol; 
+   type 0;  
+   wtitle 'Graph 6: 1000 Averages of 20 Tosses of a Fair Die'; 
+   title 'Distribution of 1000 Averages of'; 
+   title '  Twenty Tosses of a Fair Die   '; 
+   footnote 'Graph 6';
+   scale 1;
+     ticks 1:6;
+   scale 2;
+     minimum 0; 
+     maximum 300; 
+   lines c103 c104; 
+      type 5; 
+      color 4; 
+   lines c113 c114; 
+      type 1; 
+      color 2; 
+   axlabel 2 'Occurrences'; 
+   axlabel 1 'Value of Average'.
+gpause 4
+brief 2
+note
+note     Graph 7:
+note     We should all by now be fairly convinced of the effects that 
+note     increasing the sample size has on the distribution of sample 
+note     averages.  We will increase the sample size one more time to 
+note     reinforce this thought.  This time we will toss the die 30 times. 
+note     This is illustrated in Graph 7. 
+note 
+gpause 4
+brief 0
+set c115 
+2.5 2.5 2.7 2.7 2.7 2.9 2.9 2.9 3.1 3.1 3.1 3.3 3.3 3.3 3.5 3.5 3.5 3.7 3.7 
+3.7 3.9 3.9 3.9 4.1 4.1 4.1 4.3 4.3 4.3 4.5 4.5 
+end
+set c116 
+0 6 6 0 14 14 0 63 63 0 141 141 0 240 240 0 244 244 0 168 168 0 
+85 85 0 30 30 0 9 9 0 
+end
+pdf c103 c104; 
+normal 3.5 .311805. 
+let c104 = 200*c104 
+plot c104*c103; 
+   symbol ; 
+      type 0; 
+   wtitle 'Graph 7: 1000 Averages of 30 Tosses of a Fair Die'; 
+   title 'Distribution of 1000 Averages of'; 
+   title '  Thirty Tosses of a Fair Die   '; 
+   footnote 'Graph 7';
+   scale 1;
+     ticks 1:6;
+   scale 2;
+     minimum 0; 
+     maximum 300; 
+   lines c103 c104; 
+      type 5; 
+      color 4; 
+   lines c115 c116;
+      type 1;
+      color 2;
+   axlabel 2 'Occurrences';
+   axlabel 1 'Value of Average'.
+gpause 4
+brief 2
+note
+note 
+note     Let's review what we have seen. 
+note 
+note     We will draw the histograms for samples of size 2, 5, 10, 20, 
+note     and 30 together in one plot to see the changes in the 
+note     distribution. 
+note 
+note 
+brief 0
+plot c104*c103; 
+   symbol; 
+   type 0; 
+   wtitle 'Comparative Distributions of the Averages'; 
+   title 'Comparative Distributions of 1000 Averages'; 
+   title '      From the Die-Tossing Experiment     '; 
+   scale 1;
+     ticks 1:6;
+   lines c120 c106; 
+      type 1; 
+      color 2; 
+   lines c109 c110; 
+      type 1; 
+      color 4; 
+   lines c111 c112; 
+      type 1; 
+      color 5; 
+   lines c113 c114; 
+      type 1; 
+      color 3; 
+   lines c115 c116; 
+      type 1; 
+      color 7; 
+   axlabel 2 'Occurrences';
+   axlabel 1 'Value of Average';
+   footnote 'Red: n = 2    Blue: n = 5    Lt.Blue: n = 10'; 
+   footnote '     Green: n = 20      Yellow: n = 30      '. 
+
+brief 2
+tset c101
+"Summary of Results"
+" "
+"   The Central Limit Theorem tells us what we SHOULD have observed, "
+"   theoretically.  Lets' compare this to what we actually DID observe: "
+" "
+"                 Theoretical Results               Observed Results "
+"                -----------------------             ---------------------- "
+"     Sample                 Standard                          Standard "
+"       Size      Mean      Deviation          Mean     Deviation "
+"     ------      ----       ---------              --------     ---------- "
+"           1       3.5        1.707825            3.453        1.7041 "
+"           2       3.5        1.207615            3.527        1.2320 "
+"           3       3.5        0.986013            3.546        0.9503 "
+"           5       3.5        0.763763            3.481        0.7532 "
+"         10       3.5        0.540062            3.506        0.5289 "
+"         20       3.5        0.381879            3.510        0.3891 "
+"         30       3.5        0.311805            3.507        0.3148 "
+" " 
+end
+write c101
+endmtitle
+erase c101 - c120 k1
+endmacro

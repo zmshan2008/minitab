@@ -1,0 +1,491 @@
+macro
+###############################################################################
+#
+#  Macro: VDG.MAC
+#
+#  Submitted by: Eduardo Santiago 8/28/2009
+#  Revised by ESD on 3/7/2012
+#
+#  Performance issues were fixed to make the macro run faster. No macros are 
+#  called internally anymore.
+#  
+#  This macro calculates the scaled prediction variance for up to five design
+#  matrices given a specific model. This will allow you to compare designs
+#  in coded units and their performance prior to collecting any data from a DOE. 
+#
+#  The macro transforms a matrix of system inputs (D) to a design matrix (X)
+#  assuming one of the models specified with the subcommand MODEL. 
+#  By default, the macro returns the design matrix for a linear additive 
+#  model with an intercept and the corresponding interactions. 
+#
+#  The following models can be specified:
+# 
+#    linear        includes constant and linear terms
+#    interaction   includes constant, linear, and cross product terms
+#    quadratic     includes interactions plus squared terms
+#    purequadratic includes constant, linear and squared terms
+#
+#  To run the macro, the matrix of system inputs, i.e. the DOEs, have to 
+#  be stored in the SAME worksheet using coded units. 
+#
+#  Choose Edit > Command Line Editor.  Assuming the factors of a CCD have
+#  been copied to a matrix M1, and the factors of a Box-Behnken design has 
+#  been stored in M2, type the following:
+#
+#  %VDG M1 M2;
+#  MODEL "quadratic";
+#  RESOLUTION 150.
+#  
+#  Click on the Submit Commands button.  The graph will be added to your 
+#  project.
+#
+#  The optional subcommands INCREMENT will allow you to specify the 
+#  granularity at which the graph will be generated. One point is calculated
+#  by default, at every 0.1 coded units. The x-axis is the distance from the
+#  origin and starts from 0 up to the farthest edge in any one of your designs. 
+#  The default value can be modified with the MAXDIST subcommand.
+#
+#  NOTE: The subcommand 'specify' is only for macro integrity purposes
+#  and should not be used.  The value of 'fact' corresponds to the no. of factors
+#  of the matrix for which you'd like to generate a Variance Dispersion
+#  Graph. The macro will find the proper size 'fact' of the matrices. Even if
+#  provided, the macro will overwrite it.
+#
+###############################################################################
+#
+#  Neither Minitab, Inc. nor the author(s) of this MACRO makes any claim 
+#  of or offers any Warranty whatsoever with regard to the accuracy of 
+#  this MACRO or its suitability for use.  Minitab, Inc. and the author(s)
+#  of this MACRO each hereby disclaims any Warranty and/or liability with 
+#  respect thereto. 
+#
+###############################################################################
+VDG D.1-D.n;
+model type;
+resolution simul;
+increment step;
+maxdist edge; 
+specify f.
+
+mmatrix D.1-D.n Dt DtD X.1-X.n U FU FUt Xt rowx rowxt Fisher iFisher temp predict Y Yt YYt 
+mmatrix M1 M2 transp
+mcolumn minD.1-minD.n maxD.1-maxD.n avgD.1-avgD.n zeros values w.1-w.f v.1-v.f vec.1-vec.100
+mcolumn SqDist predvar rho x1 pline fact r dist col.1-col.100 beta0 eig
+mconstant f i j k l count row column step type simul determ r1 facti edge ind const next
+
+default step=0.1 type="quadratic" simul=100 f=100 
+mreset
+noecho
+brief 0
+
+if maxdist = 0
+ do i =1:n
+
+  ### Calculate the number of factors in each matrix ###
+  Transpose D.i Dt.
+  Multiply Dt D.i DtD.
+  Diagonal DtD x1.
+  Let fact[i] = count(x1)
+  Multiply D.i Dt DtD.
+  Diagonal DtD x1.
+  Let r[i] = count(x1)
+
+  ### Calculate the distance to the point farther away from the origin for D ###
+  if maxdist = 0
+    Let x1 = sqrt(x1)
+    Let dist[i] = max(x1)
+  endif
+
+
+  if i = 1
+    let facti = fact[i]
+  elseif facti NE fact[i]
+    brief 2
+    Note
+    Note  !!!Error!!! The number of factors should be the same for all 
+    Note  designs
+    exit
+  endif
+
+  Let edge = max(dist)
+
+ enddo
+endif
+
+Let type = trim(lower(type))
+if type NE "linear" and type NE "interaction" and type NE "purequadratic" and type NE "quadratic"
+  call writerror 1
+elseif step <= 0
+  call writerror 2
+elseif simul <= 0
+  call writerror 3
+elseif edge < 0
+  call writerror 4
+elseif n > 5
+  call writerror 6
+endif
+
+### For small samples, fix the seed to get consistent results ###
+if simul < 100
+   base 10.
+   brief 2
+   NOTITLE
+   NOTE
+   NOTE ** Warning ** The accuracy of the graph can be greatly improved by 
+   NOTE               increasing the number of simulations
+   NOTE
+   brief 0  
+endif
+
+### Calculate the number of columns in X ###
+if type = "quadratic"
+   let column = 1+2*facti+facti*(facti-1)/2
+elseif type = "linear"
+   let column = 1+facti
+elseif type = "interaction"
+   let column = 1+facti + facti*(facti-1)/2
+elseif type = "purequadratic"
+   let column = 1+2*facti
+endif
+
+### Main Loop: Finds the VDG for each of the n matrices provided by user ###
+do l = 1:n  
+
+  #### Convert D.l into a matrix in model form X.l ####
+  let r1 = r[l]
+  let count=1
+  copy D.l vec.1-vec.facti
+  set beta0
+    1(1:1)r1
+    End.   
+  if facti=1
+    if type = "linear"
+       copy beta0 vec.1-vec.facti X.l
+    elseif type = "interaction"
+       note
+       note You can't have an interaction model with only one factor  
+       note
+       exit
+    elseif type = "quadratic"
+       let col.1 = vec.1**2 
+       copy beta0 vec.1 col.1 X.l
+    elseif type = "purequadratic"
+       let col.1 = vec.1**2 
+       copy beta0 vec.1 col.1 X.l
+    endif
+  else
+    if type = "linear"
+       copy beta0 vec.1-vec.facti X.l
+    elseif type = "interaction"
+       let const = facti-1
+       do i = 1:const
+           let next = i+1
+           do j = next:facti
+               let col.count = vec.i*vec.j
+               let count = count + 1
+           enddo
+       enddo
+       let count = count - 1
+       copy beta0 vec.1-vec.facti col.1-col.count X.l
+    elseif type = "quadratic"
+       let const = facti-1
+       do i = 1:const
+           let next = i+1
+           do j = next:facti
+               let col.count = vec.i*vec.j
+               let count = count + 1
+           enddo
+       enddo
+       do i=1:facti
+          let col.count = vec.i**2 
+          let count = count + 1
+       enddo
+       let count = count - 1
+       copy beta0 vec.1-vec.facti col.1-col.count X.l
+     
+    elseif type = "purequadratic"
+       do i=1:facti
+          let col.count = vec.i**2 
+          let count = count + 1
+       enddo
+       let count = count - 1
+       copy beta0 vec.1-vec.facti col.1-col.count X.l
+    endif
+  endif
+
+  Transpose X.l Xt.
+  Multiply Xt X.l Fisher.
+  ### End of section: D.l converted to X.l 
+
+  ### Calculate the determinant [X.l'*X.l] 
+  Eigen Fisher eig
+  Count eig determ
+  let ind = 0
+  do i=1:determ
+    if eig[i] = 0
+      let ind = 1
+    endif
+  enddo
+  if ind = 0 
+    Let determ = sum(log(eig))
+  endif
+  ### End of Section. Determinant stored in determ ###
+
+  if ind = 1
+    brief 2
+    NOTE
+    NOTE ** Error ** The corresponding Fisher's information matrix 
+    NOTE             for your model is singular. The model cannot be fully
+    NOTE             estimated, choose a lower order model for the design 
+    NOTE             below
+    NOTE
+    print D.l
+    exit
+  endif 
+
+  ### If the log(determinant) < log(0.000000306), then exit the macro ###
+  if determ < -15
+    brief 2
+    note The design matrix below is nearly singular. 
+    print D.l
+    call writerror 5
+  endif
+
+  Invert Fisher iFisher.
+
+  let count = 1
+  set zeros
+      1(0:0/1)column
+      End.
+  let zeros[1] = 1
+  Copy zeros rowx.
+  Transpose rowx rowxt.
+  Multiply rowxt iFisher temp.
+  Multiply temp rowx predict.
+
+  ### Store min, max and average prediction variance ###
+  Copy predict values
+  let k = 1
+  let minD.l[k] = r[l]*values
+  let maxD.l[k] = r[l]*values
+  let avgD.l[k] = r[l]*values
+  let k = k + 1
+
+  ###  The following loop does a uniform search on a fixed radius   ###
+  ### At each value we store the min, max, avg. prediction variance ###
+  do i=0.1:edge/step  
+
+    ### Sample "simul" points uniformly on the hypersphere ###
+    rand simul w.1-w.facti
+    Copy w.1-w.facti Y.
+    Transpose Y Yt.
+    Multiply Y Yt YYt.
+    Diagonal YYt SqDist.
+    do j=1:facti
+       Let v.j = i*w.j/sqrt(SqDist)
+    enddo
+    copy v.1-v.facti U
+ 
+    let count=1
+  
+    copy U vec.1-vec.facti
+    set beta0
+      1(1:1)simul
+      End.   
+  
+    if facti=1
+      if type = "linear"
+         copy beta0 vec.1-vec.facti FU
+      elseif type = "interaction"
+         note
+         note You can't have an interaction model with only one factor  
+         note
+         exit
+      elseif type = "quadratic"
+         let col.1 = vec.1**2 
+         copy beta0 vec.1 col.1 FU
+      elseif type = "purequadratic"
+         let col.1 = vec.1**2 
+         copy beta0 vec.1 col.1 FU
+      endif
+    else
+      if type = "linear"
+         copy beta0 vec.1-vec.facti FU
+      elseif type = "interaction"
+         let const = facti-1
+         do i = 1:const
+             let next = i+1
+             do j = next:facti
+                 let col.count = vec.i*vec.j
+                 let count = count + 1
+             enddo
+         enddo
+         let count = count - 1
+         copy beta0 vec.1-vec.facti col.1-col.count FU
+      elseif type = "quadratic"
+         let const = facti-1
+         do i = 1:const
+             let next = i+1
+             do j = next:facti
+                 let col.count = vec.i*vec.j
+                 let count = count + 1
+             enddo
+         enddo
+         do i=1:facti
+            let col.count = vec.i**2 
+            let count = count + 1
+         enddo
+         let count = count - 1
+         copy beta0 vec.1-vec.facti col.1-col.count FU
+      elseif type = "purequadratic"
+         do i=1:facti
+            let col.count = vec.i**2 
+            let count = count + 1
+         enddo
+         let count = count - 1
+         copy beta0 vec.1-vec.facti col.1-col.count FU
+      endif
+    endif
+
+    Transpose FU FUt.
+
+    Multiply FU iFisher temp.
+    Multiply temp FUt predict.
+    Diagonal predict predvar.
+    let minD.l[k] = r[l]*min(predvar)
+    let maxD.l[k] = r[l]*max(predvar)
+    let avgD.l[k] = r[l]*mean(predvar)
+    let k = k + 1
+
+  enddo
+enddo
+
+Set rho
+  1(0:edge/0.1)1
+  End.
+let k = k - 1
+Set pline
+  1(column:column)k
+  End.
+
+### Create the overlaid graphs for all VDGs requested ###
+brief 2
+name pline 'Parameters'
+if n = 1
+  Plot minD.1*rho avgD.1*rho maxD.1*rho pline*rho;
+    Connect;
+      Type 1 2 3 1;
+      Color 4 4 4 2;
+      Size 1 1 1 1;
+    WTitle "VDG displaying the min, mean and max scaled prediction variance";
+    Title "Variance Dispersion Graph for 1 Design";
+    Axlabel 1 "Distance from origin";
+      Adisplay 1;
+    Axlabel 2 "Scaled Prediction Variance";
+      Adisplay 1;
+    Overlay.
+elseif n = 2
+  Plot minD.1*rho avgD.1*rho maxD.1*rho minD.2*rho avgD.2*rho maxD.2*rho pline*rho;
+    Connect;
+      Type 1 2 3 1 2 3 1;
+      Color 52 52 52 4 4 4 2;
+      Size 1 1 1 1 1 1 1;
+    WTitle "VDG displaying the min, mean and max scaled prediction variance";
+    Title "Overlaid Variance Dispersion Graphs for 2 Designs";
+    Axlabel 1 "Distance from origin";
+      Adisplay 1;
+    Axlabel 2 "Scaled Prediction Variance";
+      Adisplay 1;
+    Overlay.
+elseif n = 3
+  Plot minD.1*rho avgD.1*rho maxD.1*rho minD.2*rho avgD.2*rho maxD.2*rho & 
+       minD.3*rho avgD.3*rho maxD.3*rho pline*rho;
+    Connect;
+      Type 1 2 3 1 2 3 1 2 3 1;
+      Color 52 52 52 4 4 4 32 32 32 2;
+      Size 1;
+    WTitle "VDG displaying the min, mean and max scaled prediction variance";
+    Title "Overlaid Variance Dispersion Graphs for 3 Designs";
+    Axlabel 1 "Distance from origin";
+      Adisplay 1;
+    Axlabel 2 "Scaled Prediction Variance";
+      Adisplay 1;
+    Overlay.
+elseif n = 4
+  Plot minD.1*rho avgD.1*rho maxD.1*rho minD.2*rho avgD.2*rho maxD.2*rho & 
+       minD.3*rho avgD.3*rho maxD.3*rho minD.4*rho avgD.4*rho maxD.4*rho & 
+       pline*rho;
+    Connect;
+      Type 1 2 3 1 2 3 1 2 3 1 2 3 1;
+      Color 52 52 52 4 4 4 32 32 32 41 41 41 2;
+      Size 1;
+    WTitle "VDG displaying the min, mean and max scaled prediction variance";
+    Title "Overlaid Variance Dispersion Graphs for 4 Designs";
+    Axlabel 1 "Distance from origin";
+      Adisplay 1;
+    Axlabel 2 "Scaled Prediction Variance";
+      Adisplay 1;
+    Overlay.
+elseif n = 5
+  Plot minD.1*rho avgD.1*rho maxD.1*rho minD.2*rho avgD.2*rho maxD.2*rho & 
+       minD.3*rho avgD.3*rho maxD.3*rho minD.4*rho avgD.4*rho maxD.4*rho & 
+       minD.5*rho avgD.5*rho maxD.5*rho pline*rho;
+    Connect;
+      Type 1 2 3 1 2 3 1 2 3 1 2 3 1;
+      Color 52 52 52 4 4 4 32 32 32 41 41 41 84 84 84 2;
+      Size 1;
+    WTitle "VDG displaying the min, mean and max scaled prediction variance";
+    Title "Overlaid Variance Dispersion Graphs for 5 Designs";
+    Axlabel 1 "Distance from origin";
+      Adisplay 1;
+    Axlabel 2 "Scaled Prediction Variance";
+      Adisplay 1;
+    Overlay.
+endif 
+
+endmacro
+
+
+################################################################################
+
+macro
+
+writerror x
+
+mconstant x
+brief 2
+
+if x = 1
+  NOTE
+  NOTE ** Error ** Please choose one of the valid type of models included in 
+  NOTE             the documentation of this macro
+  exit
+elseif x = 2 
+  NOTE
+  NOTE ** Error ** The step size need to be larger than zero
+  NOTE
+  exit
+elseif x = 3 
+  NOTE
+  NOTE ** Error ** The number of simulations used to estimate the graph need 
+  NOTE             to be larger than zero
+  exit
+elseif x = 4
+  NOTE
+  NOTE ** Error ** The maximum distance from the center of the design need to 
+  NOTE             be larger than zero
+  exit
+elseif x = 5
+  NOTE
+  NOTE ** Error ** At least one of your matrices is nearly singular. The model
+  NOTE             estimates will be unstable, enter a different design or 
+  NOTE             choose a different model
+  exit
+elseif x = 6
+  NOTE
+  NOTE ** Error ** Invalid number of matrices. The macro can handle at the most
+  NOTE             five matrices
+  exit
+endif
+
+endmacro

@@ -1,0 +1,409 @@
+macro
+#
+#       Macro:  ANOM2FACT.MAC
+#  Written by:  Cathy Akritas, Minitab Inc.  November 2004
+#     Version:  Minitab 18  
+#
+#  This macro creates an ANOM chart for a 2 factor, 2 level factorial 
+#  design.  The interaction between the 2 factors is displayed on the same 
+#  scale as the main effects.  The default decision limits are calculated 
+#  at alpha = .05.  
+#
+#  Note:  The design must be balanced and replicated, and the levels of 
+#  the factors must be numeric, not text.  Center points are not allowed.
+#
+#  Suppose factor A is in C5,and factor B is in C6, and the response data 
+#  is in C7.  To run the macro, choose Edit > Command Line Editor and type 
+#  the command 
+#
+#  %anom2fact C7 C5 C6
+# 
+#  Click on Submit Commands.  In general, the first column given after
+#  the command is used as the response, the 2nd column is used as factor A,
+#  and the 3rd column is used as factor B.  
+#
+#  Suppose you want to base the decision limits on alpha = .01, choose
+#  Edit > Command Line Editor and type 
+#  
+#  %anom2fact C7 C5 C6;
+#    alpha .01.
+#
+#  Click on Submit Commands.
+#
+#  You can also input a custom title.  Suppose you want the title on the 
+#  graph to be "ANOM for Project 116Q Data".  Go to Edit > Command Line
+#  Editor and type 
+#
+#  %anom2fact C7 C5 C6;
+#    alpha .01;
+#    title "ANOM for Project 116Q".
+#
+#  Click on Submit Commands.  
+#
+#  What does the line for the interaction represent?
+#  If A and B each have 2 levels, then the length of the vertical line for 
+#  the interaction represents the interaction effect.  The effect is twice 
+#  the coefficient.
+#
+#  How to calculate the endpoints for the interaction line?
+#  Let A1 be the low level of A and let A2 be the high level of A.  Let B1 
+#  be the low level of B and let B2 be the high level of B.  The effect of 
+#  the interaction between A and B can be written as  
+#
+#  AB = .5(A1B1 + A2B2) - .5(A1B2 + A2B1)
+# 
+#  In notation suggested by Ott(1975), the interaction AB can be expressed 
+#  as 
+#
+#  AB = (Lbar - Ubar).  Then assuming replication,
+#
+#  Lbar = .5(A1B1_bar + A2B2_bar) = mean of the response data for the 
+#         factor combinations where the two factors have the same (Like) 
+#         subscripts.
+#
+#  Ubar = .5(A1B2_bar + A2B1_bar) = mean of the response data for the 
+#         factor combinations where the two factors have different 
+#         (Unlike) subscripts. 
+#
+#  A1B1_bar denotes the average response where A and B are both at the low
+#  level.  A2B2_bar denotes the average response where A and B are both at 
+#  the high level.  Therefore, Lbar is the average of the averages of the 
+#  responses at the LIKE subscripts.
+#
+#  A1B2_bar denotes the average response where A is at its low level and
+#  B is at its high level.  A2B1_bar denotes the average response where A 
+#  is at its high level and B is at its low level.  Therefore, Ubar is the 
+#  average of the averages of the responses at the UNLIKE subscripts.
+#
+###########################################################################
+#
+#  Neither Minitab, Inc. nor the author(s) of this MACRO makes any claim 
+#  of or offers any Warranty whatsoever with regard to the accuracy of 
+#  this MACRO or its suitability for use.  Minitab, Inc. and the author(s)
+#  of this MACRO each hereby disclaims any Warranty and/or liability with 
+#  respect thereto. 
+#
+###########################################################################
+
+anomfact y x.1-x.n;
+  title ttl;
+  gsave fn;
+  custom sp df;
+  alpha a.
+ 
+mcolumn y x.1-x.n  n12 xbar12 std12 tmp1 tmp2 tmp3 var12 lu
+mconstant N sp df ttl fn lo1 lo2 a xn1 xn2 xn3 xn4 xn5 xn6
+mconstant an bn abn alln i a2 t_tab nx1 nx2 ny
+mconstant ymin ymax xmin xmax lab1 lab2 lab3 
+mconstant wttl  lbar ubar xbar subttl vartype1 vartype2
+mconstant col1 typ1 col2 typ2 col3 typ3 fn1 fn2 fn3 fn4 
+mcolumn xbar1 xbar2 id1 id2 stds ct1 ct2 ct12 xlabs xs ys idX1 idX2
+mcolumn udl ldl ullabs xa xb xab ylabs xref1 xref2 xref3 xref4
+
+default a=.05 fn=0
+
+mreset
+noecho
+brief 0
+notitle
+endmtitle
+
+dtype y vartype1
+
+if vartype1 = 0 or vartype1 = 10 
+  mtitle "ANOM for a 2 by 2 Factorial Design Macro Error";
+    notitle.
+  brief 2
+  print "  ** Error ** Response column must be formatted as numeric, not text"
+  print "                   Macro Exiting"
+  endmtitle
+  exit
+endif
+
+# perform check for equal length columns, valid data
+if n = 1
+###The macro errors out before it gets here
+  mtitle "ANOM for a 2 by 2 Factorial Design Macro Error";
+    notitle.
+  brief 2
+  Print "  ** Error ** Specify 2 factors columns when launching the macro"
+  print "                   Macro Exiting"
+  endmtitle
+  exit
+elseif n = 2  #Check for reps.  Must have at least one rep.
+  let ny = n(y)
+  let nx1 = n(x.1)
+  let nx2 = n(x.2)
+  if (ny ne nx1) or (ny ne nx2) or (nx1 ne nx2)
+    mtitle "ANOM for a 2 by 2 Factorial Design Macro Error";
+      notitle.
+    brief 2
+    Print "  ** Error ** The response column must have the same number of rows"
+    Print "                   as both of the factor columns"
+    Print "                   Macro Exiting"
+    endmtitle
+    exit
+  endif
+  stats y;
+    by x.1 x.2;
+    n n12.
+  if max(n12) < 2
+     mtitle "ANOM for a 2 by 2 Factorial Design Macro Error";
+      notitle.
+    brief 2
+    print "  ** Error ** Design must be replicated.  Each combination of the factor levels must"
+    print "                   contain more than one observation"
+    print "                   Macro Exiting"
+    endmtitle
+    exit
+  endif
+
+# get means, counts, effects for factor 1
+stats y;
+  by x.1;
+  glab id1;
+  n ct1;    
+  mean xbar1.
+coun ct1 an
+if (an > 2)
+  mtitle "ANOM for a 2 by 2 Factorial Design Macro Error";
+    notitle.
+  brief 2
+  Print "  ** Error ** Both factors must have exactly 2 levels"
+  Print "                   Macro Exiting"
+  endmtitle
+  exit
+endif
+
+# get means, counts, effects for factor 2
+stats y;
+  by x.2;
+  glab id2;
+  n ct2;
+  mean xbar2.
+coun ct2 bn
+if (bn ne 2)    
+mtitle "ANOM for a 2 by 2 Factorial Design Macro Error";
+    notitle.
+  brief 2
+  Print "  ** Error ** Both factors must have exactly 2 levels"
+  Print "                   Macro Exiting"
+  endmtitle
+  exit
+endif
+
+  if stdev(n12) ne 0
+    mtitle "ANOM for a 2 by 2 Factorial Design Macro Error";
+      notitle.
+  brief 2
+  Print "  ** Error ** Design must be balanced.  Each combination of the factor levels must"
+  Print "                   contain the same number of observations"
+  Print "                   Macro Exiting"
+  endmtitle
+  exit
+  endif
+else
+    mtitle "ANOM for a 2 by 2 Factorial Design Macro Error";
+    notitle.
+  brief 2
+  Print "  ** Error ** Specify exactly two factor columns when launching the macro"
+  print "                   Macro Exiting"
+  endmtitle
+  exit
+endif
+
+# check to determine if both factors are numeric, not text.
+dtype x.1 vartype1
+dtype x.2 vartype2
+
+if vartype1 = 3 or vartype2 =3
+  mtitle "ANOM for a 2 by 2 Factorial Design Macro Error";
+    notitle.
+  brief 2
+  Print "  ** Error ** Levels of the factors must be numeric, not date/time"
+  print "                   Macro Exiting"
+  endmtitle 
+  exit
+endif
+
+if alpha = 1
+  if (a >= 1) & (a <= 100)         # check for alpha expressed as %
+    divi a 100 a                   #re-express as probability
+  endif
+  if (a >= 1) | (a <= 0)           # check for illegal values of alpha
+    mtitle "ANOM for a 2 by 2 Factorial Design Macro Error";
+    notitle.
+    Print "  ** Error ** Illegal value of alpha; default value of .05 will be used"
+    endmtitle
+    copy .05 a
+  endif
+endif
+
+kkname xn2 y
+kkname xn4 x.1
+kkname xn3 x.2
+let wttl = concat("Two Level Factorial ANOM for ", xn2, " by ", Xn4, ", ", Xn3)
+
+if title = 0
+  copy wttl ttl
+endif
+
+let subttl = concat("Alpha = ", a)
+copy "UDL = " "Xbar = " "LDL = " xref1
+
+# get means, counts, effects for factors 1 and 2
+stats y;
+  by x.1 x.2;
+  gvalues idX1 idX2;
+  mean xbar12;
+  stdev std12.
+coun xbar12 abn  ###abn should always be 4 for this macro
+
+let Lbar = .5*(xbar12(1) + Xbar12(4))
+let ubar = .5*(xbar12(2) + xbar12(3))
+stack lbar ubar lu
+copy "Lbar" "Ubar" ullabs
+
+let xbar = mean(y)
+let var12 = std12**2
+
+if custom = 1
+  if sp le 0
+elseif x = 11
+    mtitle "ANOM for a 2 by 2 Factorial Design Macro Error";
+    notitle.
+  brief 2
+  Print "  ** Error ** Standard deviation must be greater than zero"
+  print "                   Macro Exiting"
+  endmtitle
+  exit
+  endif
+  if df le 1
+ mtitle "ANOM for a 2 by 2 Factorial Design Macro Error";
+    notitle.
+  brief 2
+  Print "  ** Error ** Degrees of Freedom must be greater than 1"
+  print "                   Macro Exiting"
+  endmtitle
+  exit  
+  endif
+else
+  let sp = sqrt(sum((n12-1)*var12)/sum(n12-1))
+  let df = sum(n12-1)
+endif
+let a2 = a/2
+invCDF a2 t_tab;
+   T df.
+let t_tab = abso(t_tab)
+let udl = xbar + .5*t_tab*sp/sqrt(n12(1))
+let Ldl = xbar - .5*t_tab*sp/sqrt(n12(1))
+
+stack xn4 xn3 "Interaction" xlabs
+copy 1 1 xa
+copy 2 2 xb
+copy 3 3 xab
+
+sort lu ullabs lu ullabs;
+  by lu.
+sort xbar1 id1 xbar1 id1;
+  by xbar1.
+sort xbar2 id2 xbar2 id2;
+  by xbar2.
+
+if xbar1(1) < ldl
+  let col1 = 25
+  let typ1 = 12
+else
+  let col1 = 1
+  let typ1 = 6
+endif
+
+if xbar2(1) < ldl
+  let col2 = 25
+  let typ2 = 12
+else
+  let col2 = 1
+  let typ2 = 6
+endif
+
+if lu(1) < ldl 
+  let col3 = 25
+  let typ3 = 12
+else
+  let col3 = 1
+  let typ3 = 6
+endif
+
+stack id1 id2 ullabs ylabs
+stack xa xb xab xs
+let xs = xs + .075
+stack xbar1 xbar2 lu ys
+stack udl xbar ldl xref2
+text xref2 xref3
+concat xref1 xref3 xref4
+unstack xref4 lab1 lab2 lab3
+let fn3 = "Lbar = Mean response for Like subscripts = Mean response for A1B1 and A2B2"
+###let fn2 = "Mean response for A1B1 and A2B2"
+###kkcat fn1 fn2 fn3
+let fn4 = "Ubar = Mean response for Unlike subscripts = Mean response for A1B2 and A2B1"
+###let fn2 = "Mean response for A1B2 and A2B1"
+###kkcat fn1 fn2 fn4
+#let fn1 = "A1 = low level of 1st factor, A2 = high level of 1st factor; "
+#let fn2 = "B1 = low level of 2nd factor, B2 = high level of 2nd factor"
+#kkcat fn1 fn2 fn4
+
+mtitle "ANOM for a 2 by 2 Factorial Design";
+  notitle.  
+plot xbar1*xa xbar2*xb lu*xab;
+  wtitle wttl;
+  reference 2 udl;
+    label lab1;
+    type 2;
+    color 25;
+    size 1;
+  reference 2 ldl;
+    label lab3;
+    type 2;
+    color 25;
+    size 1;
+  reference 2 xbar;
+    label lab2;
+    color 53;
+  text xs ys ylabs;
+    placement 1 0;
+    psize 10;
+  Scale 1;
+    LDisplay 1 1 1 0;
+    mini .5;
+    max 3.5;
+    tick 1 2 3;
+    Labels xlabs;
+  scale 2;
+    hdisplay 0 0 0 0;
+  AxLabel 1 "Factors";
+  Axlabel 2 "Means";
+  NoLegend;
+  Overlay;
+  NoJitter;
+  Connect;
+    Type 1 1 1;
+    Color 74 74 74;
+    Size 1 1 1;
+  Symbol;
+    Type typ1 typ2 typ3;
+    color col1 col2 col3; 
+    Size 1; 
+  Title ttl;
+  Subtitle subttl;
+Footnote fn3;
+    PSize 8;
+    Right;
+    offset 0 .029874;
+  Footnote fn4;
+    PSize 8;
+    Right;
+    offset 0 .003775;
+  NoDTitle.
+endmtitle
+endmacro
+

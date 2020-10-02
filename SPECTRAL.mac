@@ -1,0 +1,517 @@
+Macro
+#**************************************************************************
+#
+#  Macro:             Spectral.MAC
+#  Version:           Minitab 18
+#  Final Date:        April 2, 2004
+#  Author:            Steven Orlich
+#                     Minitab Inc.
+#                     Quality Plaza
+#                     1829 Pine Hall Road
+#                     State College, PA  16801-3008
+#
+#**************************************************************************
+#
+#  Description:  This macro provides the following tools for spectral 
+#  analysis:  the periodogram, the cumulative periodogram, the estimated 
+#  spectral function, and spectral model checking.  These functions are 
+#  very valuable for stationary processes and provide frequency analysis 
+#  methods for residual and ARIMA model diagnostics.
+#
+#**************************************************************************
+#
+#  Neither Minitab, Inc. nor the author(s) of this MACRO makes any claim 
+#  of or offers any Warranty whatsoever with regard to the accuracy of 
+#  this MACRO or its suitability for use.  Minitab, Inc. and the author(s)
+#  of this MACRO each hereby disclaims any Warranty and/or liability with 
+#  respect thereto. 
+#
+#**************************************************************************
+
+#**************************************************************************
+#              Spectral
+#              Command and Subcommands
+#
+#  Spectral C        Specify your series.
+#  AR k..k           Specify your estimated AR parameters (if any).
+#  Dif k             Specify your difference order (if any).
+#  MA k..k           Specify your estimated MA parameters (if any).
+#  Variance K        Specify estimated variance (default = 1) for the 
+#                    spectrum.
+#  Smooth K          Specify a moving average smoother (default = 3).
+#  Onedoc            Choose to display all plots on one page.
+#  Speriod C C       Choose to store the coordinates for the periodogram.
+#  Scumul C C C C    Choose to store the coordinates for the cumulative 
+#                    periodogram.
+# Sspec C C C C      Choose to store the coordinates for the spectral 
+#                    estimate.
+# Smodel C C C C C   Choose to store the coordinates for spectral model 
+#                    checking.
+
+#**************************************************************************
+
+Spectral Y;
+ar alp.1-alp.a;
+dif b;
+ma beta.1-beta.c;
+variance sigma;
+smooth sm;
+speriod St.1-St.2;
+scumul St1.1-St1.4;
+sspec St2.1-St2.4;
+smodel St3.1-St3.5;
+onedoc.
+
+Mcolumn Y Ycopy Col Iomega Iomega2 Cumul Xaxis Cuaxis Line Line2
+Mcolumn AA.1-AA.20 Ave LL UU Total Total2 BB.1-BB.50 CC.1-CC.50
+Mcolumn DD.1-DD.50 EE.1-EE.50 Sum1 Sum2 First Second Fomega Lower Upper
+Mcolumn Junk TT St.1-St.2 St1.1-St1.4 St2.1-St2.4 St3.1-St3.5
+
+Mconstant a b c alp.1-alp.a beta.1-beta.c n1 m i d omega mprime
+Mconstant int up lo sigma e sm start past futu lgg df err z
+
+default sigma = 1
+default sm = 3
+
+mreset
+noecho
+brief 0
+notitle
+endmtitle
+
+#***************************************************************************
+#Error checks
+
+IF dif
+  IF b <= 0
+    call Writerror 1
+    exit
+  ENDIF
+ENDIF
+
+IF sigma <= 0
+  call Writerror 2
+  exit
+ENDIF
+
+let lgg = (sm-1)/2       #2p+1=length of smoother
+
+IF smooth
+  dtype lgg err
+    IF sm < 0 or err <> 2
+      call Writerror 3
+      exit
+    ENDIF
+ENDIF
+
+IF not AR and not MA and smodel
+  call Writerror 4
+  exit
+ENDIF
+
+#***************************************************************************
+#Compute the differenced series
+
+IF dif
+  difference b Y Ycopy
+ELSE
+  copy Y Ycopy
+ENDIF
+
+#***************************************************************************
+#Compute the Periodogram / Cumulative Periodogram
+count Ycopy n1
+
+set Col
+1:n1
+end
+
+let m = floor(n1/2)
+IF m*2=n1
+  let m = m-1
+ENDIF
+
+DO i = 1:m
+  let omega = 2*pi()*(i/n1)
+  let Iomega[i] = ((sum(Ycopy*cos(omega*Col))**2) + (sum(Ycopy*sin(omega*Col))**2))/n1
+  let Cumul[i] = sum(Iomega)
+ENDDO
+
+IF (m+1)*2 = n1
+  let Iomega[m+1] = (sum(Ycopy*(-1)**(Col))**2)/n1
+  let d = m+1
+  set Xaxis
+  1:d
+  end
+ELSE
+  set Xaxis
+  1:m
+  end
+ENDIF
+
+let Cumul = Cumul / Cumul[m]
+copy Cumul Cumul;
+omit m.
+let Xaxis = (Xaxis * 2 * pi()) / n1
+
+#***************************************************************************
+#Compute confidence limits for cumulative periodogram
+
+let mprime = m-1
+set Cuaxis
+1:mprime
+end
+let Cuaxis = Cuaxis/mprime
+let Int = 1.224/(sqrt(mprime)+0.12+(0.11/sqrt(mprime)))  #From Diggle p.55
+let Line = Int + Cuaxis
+let Line2 = -Int + Cuaxis
+
+DO i = 1:mprime
+  IF Line[i] < 0 
+    let Line[i] = '*'
+  ELSE IF Line2[i] < 0
+    let Line2[i] = '*'
+  ENDIF
+ENDDO
+
+#***************************************************************************
+#Compute 2p+1 point moving average and CI for spectral estimate
+
+count Iomega e
+let start = sm-lgg       #starting point
+
+DO i = 1:e
+  IF i >= start 
+    let past = i-lgg
+    let futu = i+lgg
+    
+  IF futu > e
+    let Ave[i] = '*'
+  ELSE
+    copy Iomega Junk;
+      use past:futu.
+    let Ave[i] = mean(Junk)
+  ENDIF
+ELSE
+  let Ave[i] = '*'
+ENDIF
+ENDDO
+
+let df = 2*sm
+invcdf .95 up;
+  chis df.
+invcdf .05 lo;
+  chis df.
+let LL = (df*Ave)/lo
+let UU = (df*Ave)/up
+
+#***************************************************************************
+#Compute AR or MA or ARMA spectrum
+
+IF AR
+  DO i = 1:a
+    let BB.i = alp.i * cos(i*Xaxis)
+    let CC.i = alp.i * sin(i*Xaxis)
+  ENDDO
+
+  rsum BB.1-BB.a Total
+  rsum CC.1-CC.a Total2
+  let Second = 1/(((1-Total)**2) + (Total2**2))
+ENDIF
+
+IF MA
+  DO i = 1:c
+    let DD.i = beta.i * cos(i*Xaxis)
+    let EE.i = beta.i * sin(i*Xaxis)
+  ENDDO
+  rsum DD.1-DD.c Sum1
+  rsum EE.1-EE.c Sum2
+  let First = sigma*(((1+Sum1)**2) + (Sum2**2))
+ENDIF
+
+IF AR and MA
+  let Fomega = First*Second
+ELSEIF AR
+  let Fomega = sigma*Second
+ELSEIF MA
+  copy First Fomega
+ENDIF
+
+#***************************************************************************
+#Calculate confidence bounds for Spectral Checking
+
+IF AR or MA
+  let Lower = loge(Fomega)+loge(lo)-loge(df)
+  let Upper = loge(Fomega)+loge(up)-loge(df)
+ENDIF
+
+#***************************************************************************
+#Display length of smoother on plot
+kkset z "Length of smoother: "
+copy sm TT
+text TT TT
+copy TT sm
+kkcat z sm z
+
+mtitle "Spectral Analysis";
+  notitle.
+
+#***************************************************************************
+#Plot the spectrums
+
+IF AR or MA
+  IF Onedoc
+    title
+    layout
+    plot Iomega*Xaxis;
+      symbol;
+      connect;
+      axlabel 1 "Omega";
+      axlabel 2 "I(omega)";
+      figure 0 0.5 0.5 1;
+      title "Periodogram".
+
+    plot Cumul*Cuaxis Line*Cuaxis Line2*Cuaxis;
+      overlay;
+      symbol;
+        type 6 0 0;
+      connect;
+        type 0 2 2;
+        color 2 16 16;
+      axlabel 1 "J/(m-1)";
+      axlabel 2 "U(j)";
+      figure 0.5 1 0.5 1;
+      title "Cumulative Periodogram, 10% Significance Lines";
+      nolegend.
+
+   plot Ave*Xaxis LL*Xaxis UU*Xaxis;
+     overlay;
+     connect;
+       type 1 2 2;
+       color 2 16 16;
+     axlabel 1 "Omega";
+     axlabel 2 "F(omega)";
+     figure 0 0.5 0 0.5;
+     title "Spectral Estimate, 90% Confidence Limits";
+     nolegend;
+     footnote z.
+
+   let Fomega = loge(Fomega)
+   let Ave = loge(Ave)
+ 
+   plot Fomega*Xaxis Upper*Xaxis Lower*Xaxis Ave*Xaxis;
+     overlay;
+     symbol;
+       type 0 0 0 1;
+       color 2;
+     connect;
+       type 1 2 2 0;
+       color 1 16 16;
+     axlabel 1 "Omega"; 
+     axlabel 2 "Ln{F(omega}";
+     figure 0.5 1 0 0.5;
+     title "Spectral Model Check, 90% Tolerance Limits";
+     nolegend.
+
+  endlayout
+
+  notitle
+
+ELSE
+   title
+   plot Iomega*Xaxis;
+     symbol;
+       connect;
+     axlabel 1 "Omega";
+     axlabel 2 "I(omega)";
+     title "Periodogram";
+     wtitle "Periodogram".
+
+   plot Cumul*Cuaxis Line*Cuaxis Line2*Cuaxis;
+     overlay;
+     symbol;
+       type 6 0 0;
+     connect;
+       type 0 2 2;
+       color 2 16 16;
+     axlabel 1 "J/(m-1)";
+     axlabel 2 "U(j)";
+     title "Cumulative Periodogram, 10% Significance Lines";
+     wtitle "Cumulative Periodogram, 10% Significance Lines";
+     nolegend.
+
+   plot Ave*Xaxis LL*Xaxis UU*Xaxis;
+     overlay;
+     connect;
+       type 1 2 2;
+       color 2 16 16;
+     axlabel 1 "Omega";
+     axlabel 2 "F(omega)";
+     title "Spectral Estimate, 90% Confidence Limits";
+     wtitle "Spectral Estimate, 90% Confidence Limits";
+     nolegend;
+     footnote z.
+
+   let Fomega = loge(Fomega)
+   let Ave = loge(Ave)
+
+   plot Fomega*Xaxis Upper*Xaxis Lower*Xaxis Ave*Xaxis;
+     overlay;
+     symbol;
+       type 0 0 0 1;
+       color 2;
+     connect;
+       type 1 2 2 0;
+       color 1 16 16;
+     axlabel 1 "Omega";
+     axlabel 2 "Ln{F(omega}";
+     title "Spectral Model Check, 90% Tolerance Limits";
+     wtitle "Spectral Model Check, 90% Tolerance Limits";
+     nolegend.
+
+   notitle
+
+  ENDIF
+
+ELSE
+
+  IF Onedoc
+   title
+   layout
+   plot Iomega*Xaxis;
+     symbol;
+     connect;
+     axlabel 1 "Omega";
+     axlabel 2 "I(omega)";
+     figure 0 0.5 0.5 1;
+     title "Periodogram".
+
+   plot Cumul*Cuaxis Line*Cuaxis Line2*Cuaxis;
+     overlay;
+     symbol;
+       type 6 0 0;
+     connect;
+       type 0 2 2;
+       color 2 16 16;
+     axlabel 1 "J/(m-1)";
+     axlabel 2 "U(j)";
+     figure 0.5 1 0.5 1;
+     title "Cumulative Periodogram, 10% Significance Lines";
+     nolegend.
+
+    plot Ave*Xaxis LL*Xaxis UU*Xaxis;
+      overlay;
+      connect;
+        type 1 2 2;
+        color 2 16 16;
+      axlabel 1 "Omega";
+      axlabel 2 "F(omega)";
+      figure 0 1 0 0.5;
+      title "Spectral Estimate, 90% Confidence Limits";
+      footnote z;
+      nolegend.
+
+      endlayout
+      notitle
+
+    ELSE
+
+    title
+    plot Iomega*Xaxis;
+      symbol;
+      connect;
+      axlabel 1 "Omega";
+      axlabel 2 "I(omega)";
+      title "Periodogram";
+      wtitle "Periodogram".
+
+    plot Cumul*Cuaxis Line*Cuaxis Line2*Cuaxis;
+      overlay;
+      symbol;
+        type 6 0 0;
+      connect;
+        type 0 2 2;
+        color 2 16 16;
+      axlabel 1 "J/(m-1)";
+      axlabel 2 "U(j)";
+      title "Cumulative Periodogram, 10% Significance Lines";
+      wtitle "Cumulative Periodogram, 10% Significance Lines";
+      nolegend.
+
+    plot Ave*Xaxis LL*Xaxis UU*Xaxis;
+      overlay;
+      connect;
+        type 1 2 2;
+        color 2 16 16;
+      axlabel 1 "Omega";
+      axlabel 2 "F(omega)";
+      title "Spectral Estimate, 90% Confidence Limits";
+      wtitle "Spectral Estimate, 90% Confidence Limits";
+      footnote z;
+      nolegend.
+
+    endlayout
+    notitle
+    ENDIF
+ENDIF
+
+#***************************************************************************
+#Storage
+
+IF speriod
+  copy Iomega Xaxis St.1-St.2
+ENDIF
+
+IF scumul
+  copy Cumul Line Line2 Cuaxis St1.1-St1.4
+ENDIF
+
+IF sspec
+  copy Ave LL UU Xaxis St2.1-St2.4
+ENDIF
+
+IF smodel
+  copy Fomega Upper Lower Ave Xaxis St3.1-St3.5
+ENDIF
+
+#***************************************************************************
+endmtitle
+Endmacro
+
+#*********************************************************
+#Error Macro
+Macro
+Writerror a
+Mconstant a
+
+IF a = 1
+  mtitle "Spectral Analysis Macro Error";
+    notitle.
+  brief 2
+  print " **Error** Difference must a positive integer."
+  print "                Macro Exiting"
+  endmtitle
+ELSE IF a = 2
+  mtitle "Spectral Analysis Macro Error";
+    notitle.
+  brief 2
+  print " **Error** Variance must be positive."
+  print "                Macro Exiting"
+  endmtitle
+ELSE IF a = 3
+  mtitle "Spectral Analysis Macro Error";
+    notitle.
+  brief 2
+  print " **Error** Smoother must be an odd integer > 0."
+  print "                Macro Exiting"
+  endmtitle
+ELSE IF a = 4
+  mtitle "Spectral Analysis Macro Error";
+    notitle.
+  brief 2
+  print " **Error** AR or MA (or both) must be specified when SMODEL specified."
+  print "                Macro Exiting"
+  endmtitle
+
+ENDIF
+ENDMACRO

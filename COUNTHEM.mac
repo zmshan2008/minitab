@@ -1,0 +1,109 @@
+gmacro 
+ 
+#     Name:  COUNTHEM.MAC 
+#  Version:  Minitab 18
+#
+#  Description:  This macro simulates the tossing of a coin a specified
+#  number of times, and accumulates the total number of tosses, the total 
+#  number of heads, the proportion of heads, and the difference between 
+#  the total number of heads and the total number of tails.   
+#
+#  This macro prompts you for input.  For this to work, you must show
+#  the Command Line window prior to running the macro.  To show the 
+#  Command Line window, click anywhere in the Session window to make it the
+#  active window.  Go to the top menu bar, select Editor > Show Command Line.  
+#  The Session window is now segmented into two panes.  The pane on the right 
+#  is the Command Line window which displays the "MTB>" prompt.  
+#
+#  To launch the macro, at the MTB> prompt, type 
+#
+#  %counthem
+# 
+#  and hit <Enter>
+#
+# 
+#  Author:  Ronald L. Wasserstein  
+#           Department of Mathematics and Statistics 
+#           Washburn University of Topeka  
+#           Topeka, KS 66621    
+#           (913) 295-6636 
+# 
+#  Reviewer:  John D. McKenzie, Jr. 
+#             Babson College 
+#             Babson Park, MA 02157-0310 
+# 
+#  Computer and Operating System:  PR1ME 9755 running PRIMOS 
+#  MINITAB Release:  7.2 
+#  Date Submitted:  June 27, 1990 
+#  Date Reviewed:  June 20, 1992 
+# 
+#  Input Arguments: 
+#  K1 -------> Number of tosses of the coin between recalculation of  
+#              results 
+#  K2 -------> Iteration counter 
+# 
+#  Scratch Storage:  
+#  C1 -------> K1 observations randomly generated from a continuous  
+#              uniform distribution on 0 to 1 
+#  C11 ------> K1 observations computed by rounding the values of C1 
+#  C2 -------> Number of heads in each set of K1 tosses of the coin 
+# 
+#  Stored Results:   
+#  C3 -------> Accumulated number of tosses 
+#  C4 -------> Accumulated number of heads 
+#  C5 -------> Accumulated proportion of heads 
+#  C6 -------> Accumulated difference between the number of heads 
+#              and the number of tails 
+# 
+###########################################################################
+#
+#  Neither Minitab, Inc. nor the author(s) of this MACRO makes any claim 
+#  of or offers any Warranty whatsoever with regard to the accuracy of 
+#  this MACRO or its suitability for use.  Minitab, Inc. and the author(s)
+#  of this MACRO each hereby disclaims any Warranty and/or liability with 
+#  respect thereto. 
+#
+###########################################################################
+counthem 
+mreset
+noecho
+
+new 
+NAME C3 'NUMTOSS' C4 'NUMHEADS' C5 'PROPORTN' C6 'DIFF' 
+NOTE 
+NOTE  At the 'DATA>' prompt below, enter the number of times to toss   
+NOTE  the coin, and the number of sets to toss the coin that many times.   
+NOTE 
+NOTE  For example, if you wish to toss the coin 50 times and repeat that 
+NOTE  5 times for a total of 250 tosses, enter 50, 5 and press Enter.   
+NOTE  
+
+set c100 ; 
+file 'terminal'; 
+nobs 2. 
+copy c100 k1 k100 
+do k2 = 1:k100 
+  RANDOM K1 C1; 
+    UNIFORM 0 1. 
+  LET C11 = ROUND(C1) 
+  LET C2[K2] = SUM(C11) 
+  LET K3 = (K2 EQ 1) 
+  LET K4 = NOT K3 
+
+  IF K3 = 1 
+   LET C3[K2] = K1 
+   LET C4[K2] = C2[K2] 
+  ELSE 
+  ENDIF 
+
+  IF K4 = 1  
+    LET C3[K2] = C3[K2-1] + K1 
+    LET C4[K2] = C4[K2-1] + C2[K2] 
+  ELSE 
+  ENDIF 
+
+  LET C5[K2] = C4[K2]/C3[K2] 
+  LET C6[K2] = 2*C4[K2] - C3[K2] 
+enddo  
+erase c1 c2 c11
+ENDMACRO
